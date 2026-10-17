@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0f1630">
+  <title>RobPlay — приключения робота</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="hud-left">
+      <span id="hud-level"></span>
+    </div>
+    <div class="hud-right">
+      <span class="pill">🪙 <b id="hud-coins">0/0</b></span>
+      <span class="pill">⏱ <b id="hud-time">0.0</b></span>
+      <span class="pill">💀 <b id="hud-deaths">0</b></span>
+      <button id="btn-pause" class="icon-btn" aria-label="Пауза">⏸</button>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <!-- Главное меню -->
+  <section id="screen-menu" class="screen">
+    <div class="panel">
+      <h1 class="logo">Rob<span>Play</span></h1>
+      <p class="subtitle">Платформер о маленьком храбром роботе</p>
+      <button class="btn primary" data-action="continue">▶ Играть</button>
+      <button class="btn" data-action="levels">Выбор уровня</button>
+      <button class="btn" data-action="howto">Управление</button>
+      <div class="row">
+        <button class="btn small" data-action="toggle-sound" id="btn-sound">🔊 Звук</button>
+        <button class="btn small" data-action="toggle-music" id="btn-music">🎵 Музыка</button>
+      </div>
+      <p class="total" id="menu-total"></p>
+    </div>
+  </section>
+
+  <!-- Выбор уровня -->
+  <section id="screen-levels" class="screen hidden">
+    <div class="panel wide">
+      <h2>Выбор уровня</h2>
+      <div id="level-grid" class="level-grid"></div>
+      <button class="btn" data-action="menu">← Назад</button>
+    </div>
+  </section>
+
+  <!-- Управление -->
+  <section id="screen-howto" class="screen hidden">
+    <div class="panel wide">
+      <h2>Управление</h2>
+      <table class="keys">
+        <tr><td><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd></td><td>Бег</td></tr>
+        <tr><td><kbd>Пробел</kbd> / <kbd>W</kbd> / <kbd>↑</kbd></td><td>Прыжок (ещё раз в воздухе — двойной)</td></tr>
+        <tr><td><kbd>Shift</kbd> / <kbd>X</kbd></td><td>Рывок — пробивает врагов</td></tr>
+        <tr><td><kbd>↓</kbd> / <kbd>S</kbd></td><td>Спрыгнуть с тонкой платформы</td></tr>
+        <tr><td><kbd>Esc</kbd> / <kbd>P</kbd></td><td>Пауза</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Начать уровень заново</td></tr>
+      </table>
+      <p class="hint">Держи прыжок дольше — прыгнешь выше. Прижмись к стене в полёте, чтобы скользить и отталкиваться.
+        Поддерживаются геймпады и сенсорный экран.</p>
+      <p class="hint">⭐ за прохождение, ⭐ за все монеты, ⭐ за время быстрее рекорда уровня.</p>
+      <button class="btn" data-action="menu">← Назад</button>
+    </div>
+  </section>
+
+  <!-- Пауза -->
+  <section id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h2>Пауза</h2>
+      <button class="btn primary" data-action="resume">▶ Продолжить</button>
+      <button class="btn" data-action="restart">↻ Заново</button>
+      <div class="row">
+        <button class="btn small" data-action="toggle-sound">🔊 Звук</button>
+        <button class="btn small" data-action="toggle-music">🎵 Музыка</button>
+      </div>
+      <button class="btn" data-action="levels">Выбор уровня</button>
+      <button class="btn" data-action="menu">Главное меню</button>
+    </div>
+  </section>
+
+  <!-- Уровень пройден -->
+  <section id="screen-complete" class="screen hidden">
+    <div class="panel">
+      <h2 id="complete-title">Уровень пройден!</h2>
+      <div class="stars" id="complete-stars"></div>
+      <div class="stats" id="complete-stats"></div>
+      <button class="btn primary" data-action="next" id="btn-next">Дальше ▶</button>
+      <button class="btn" data-action="restart">↻ Ещё раз</button>
+      <button class="btn" data-action="levels">Выбор уровня</button>
+    </div>
+  </section>
+
+  <!-- Сенсорное управление -->
+  <div id="touch" class="hidden">
+    <div class="touch-left">
+      <button class="tbtn" data-key="left">◀</button>
+      <button class="tbtn" data-key="right">▶</button>
+    </div>
+    <div class="touch-right">
+      <button class="tbtn small" data-key="down">▼</button>
+      <button class="tbtn" data-key="dash">⚡</button>
+      <button class="tbtn big" data-key="jump">⤒</button>
+    </div>
+  </div>
+
+  <script src="levels.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
