@@ -22,6 +22,11 @@
     </div>
   </div>
 
+  <div id="bossbar" class="hidden">
+    <span id="boss-name"></span>
+    <div class="bar"><div id="boss-fill"></div></div>
+  </div>
+
   <div id="toast" class="hidden"></div>
 
   <!-- Главное меню -->
@@ -63,7 +68,21 @@
       </table>
       <p class="hint">Держи прыжок дольше — прыгнешь выше. Прижмись к стене в полёте, чтобы скользить и отталкиваться.
         Поддерживаются геймпады и сенсорный экран.</p>
-      <p class="hint">⭐ за прохождение, ⭐ за все монеты, ⭐ за время быстрее рекорда уровня.</p>
+      <p class="hint">⭐ за прохождение, ⭐ за все монеты, ⭐ за время быстрее цели уровня.</p>
+      <h2 class="sub">Враги</h2>
+      <table class="keys bestiary">
+        <tr><td>🔴 Ходок</td><td>Растопчи сверху или пробей рывком</td></tr>
+        <tr><td>🐸 Прыгун</td><td>Скачет к тебе — растопчи в полёте</td></tr>
+        <tr><td>🦔 Ёж</td><td>Колючий! Только рывок</td></tr>
+        <tr><td>🐂 Таран</td><td>Разгоняется, заметив тебя. Уйди с дороги или прыгни сверху</td></tr>
+        <tr><td>🔫 Турель</td><td>Стреляет — перепрыгивай снаряды</td></tr>
+        <tr><td>🟣 Летун</td><td>Летает по кругу, можно растоптать</td></tr>
+        <tr><td>🦇 Мышь</td><td>Пикирует сверху, когда ты под ней</td></tr>
+        <tr><td>👻 Призрак</td><td>Крадётся, когда ты к нему спиной. Только рывок</td></tr>
+        <tr><td>⚙️ Пила</td><td>Неуязвима — обходи</td></tr>
+        <tr><td>🪨 Давилка</td><td>Падает сверху. На неё можно запрыгнуть</td></tr>
+        <tr><td>👑 Боссы</td><td>Каждый 10-й уровень. Ищи момент для удара!</td></tr>
+      </table>
       <button class="btn" data-action="menu">← Назад</button>
     </div>
   </section>
@@ -109,6 +128,9 @@
   </div>
 
   <script src="levels.js"></script>
+  <script src="enemies.js"></script>
+  <script src="boss.js"></script>
+  <script src="fx.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

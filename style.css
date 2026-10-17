@@ -113,3 +113,21 @@ kbd {
 .tbtn.big { width: 84px; height: 84px; font-size: 32px; }
 .tbtn.small { width: 52px; height: 52px; font-size: 18px; }
 .tbtn.active { background: rgba(111,211,255,.4); }
+
+/* Босс */
+#bossbar {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  width: min(440px, 80vw); text-align: center; pointer-events: none;
+  font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,.6);
+}
+#bossbar .bar {
+  margin-top: 4px; height: 14px; border-radius: 999px; overflow: hidden;
+  background: rgba(10,16,40,.7); border: 2px solid rgba(255,255,255,.25);
+}
+#boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff3d5a, #ffb347); transition: width .3s; }
+.world-title { grid-column: 1 / -1; text-align: left; font-weight: 800; color: #ffd54a; margin-top: 6px; }
+.level-card.boss { background: #4a2350; border-color: rgba(255,93,115,.5); }
+h2.sub { margin-top: 10px; font-size: 20px; }
+.bestiary td:first-child { white-space: nowrap; }
+.panel.wide { max-height: calc(100vh - 32px); overflow-y: auto; }
+#bossbar:not(.hidden) ~ #toast { top: 104px; }
