@@ -22,6 +22,11 @@ const ENEMY_INFO = {
   spider:  { stomp: true,  dash: true,  color: '#3a2d4a' },
   bomber:  { stomp: true,  dash: true,  color: '#5a7a3a' },
   launcher:{ stomp: true,  dash: true,  color: '#5a6078' },
+  eye:     { stomp: true,  dash: true,  color: '#ff3b5c' },
+  mine:    { stomp: true,  dash: true,  color: '#5a6078' },
+  turtle:  { stomp: true,  dash: true,  color: '#3a9a5a' },
+  ninja:   { stomp: true,  dash: true,  color: '#2b2f40' },
+  shade:   { stomp: true,  dash: true,  color: '#3a1a5a' },
 };
 
 function makeEnemy(c, px, py) {
@@ -42,6 +47,11 @@ function makeEnemy(c, px, py) {
     case 'U': return { ...base, type: 'spider', x: px + 4, y0: py, y: py, w: 24, h: 20, anchor: Math.max(0, py - TILE * 4) };
     case 'A': return { ...base, type: 'bomber', x: px + 3, y: py + TILE - 26, w: 26, h: 26, vx: -30, timer: rand(1, 2.5) };
     case 'R': return { ...base, type: 'launcher', x: px + 1, y: py + TILE - 24, w: 30, h: 24, timer: rand(1, 2.5) };
+    case 'L': return { ...base, type: 'eye', x: px + 3, y: py + TILE - 26, w: 26, h: 26, state: 'idle', timer: rand(0.5, 1.5) };
+    case 'I': return { ...base, type: 'mine', x0: px + 5, y0: py + 5, x: px + 5, y: py + 5, w: 22, h: 22, state: 'idle' };
+    case '1': return { ...base, type: 'turtle', x: px + 1, y: py + TILE - 22, w: 30, h: 22, vx: -35 };
+    case '2': return { ...base, type: 'ninja', x: px + 4, y: py + TILE - 26, w: 24, h: 26, timer: rand(1, 2) };
+    case '3': return { ...base, type: 'shade', x: px + 5, y: py + TILE - 28, w: 22, h: 28, vx: -120 };
   }
   return null;
 }
@@ -212,7 +222,7 @@ function updateEnemies(L, p, dt) {
           groundMove(L, e, dt, false);
           // скользящий панцирь сбивает других врагов
           for (const o of L.enemies) {
-            if (o !== e && o.alive && ENEMY_INFO[o.type].dash && overlap(e, o)) killEnemy(o, null, false);
+            if (o !== e && o.alive && ENEMY_INFO[o.type].dash && overlap(e, o)) { killEnemy(o, null, false); Save.data.flags.shell = true; }
           }
           if (Math.random() < 0.5) emit(e.x + e.w / 2, e.y + e.h, 1, { color: '#ffffff88', speed: 40, grav: 50, life: 0.3 });
         } else {
@@ -276,6 +286,75 @@ function updateEnemies(L, p, dt) {
         }
         break;
 
+      case 'eye': {
+        // глаз-лазер: заряжается и стреляет коротким лучом
+        if (e.state === 'idle' && near && Math.abs(dy) < TILE * 2.5) e.face = dx > 0 ? 1 : -1;
+        e.timer -= dt;
+        if (e.state === 'idle' && e.timer <= 0) {
+          if (near && Math.abs(dx) < 8 * TILE && Math.abs(dy) < TILE * 2.5) { e.state = 'charge'; e.timer = 0.8; if (onScreen(e.x, e.y)) Sound.play('laserCharge'); }
+          else e.timer = 0.4;
+        } else if (e.state === 'charge' && e.timer <= 0) {
+          e.state = 'fire'; e.timer = 0.5; if (onScreen(e.x, e.y)) Sound.play('laserFire');
+        } else if (e.state === 'fire') {
+          const bm = eyeBeam(L, e);
+          if (!p.dead && p.spawnT <= 0 && overlap(p, bm)) killPlayer();
+          if (e.timer <= 0) { e.state = 'idle'; e.timer = rand(1.2, 1.8); }
+        }
+        break;
+      }
+
+      case 'mine':
+        e.x = e.x0 + Math.sin(e.t * 0.8) * 10;
+        e.y = e.y0 + Math.sin(e.t * 2) * 6;
+        if (e.state === 'idle') {
+          if (!p.dead && Math.hypot(dx, dy) < 75) { e.state = 'arm'; e.timer = 0.8; }
+        } else {
+          e.timer -= dt;
+          if (Math.floor(e.timer * 10) % 2 === 0 && !e.beeped) { e.beeped = true; Sound.play('beep'); }
+          if (Math.floor(e.timer * 10) % 2 === 1) e.beeped = false;
+          if (e.timer <= 0) {
+            e.alive = false; e.deadT = 0;
+            emit(e.x + e.w / 2, e.y + e.h / 2, 30, { color: ['#ffd54a', '#ff7a3d', '#555'], speed: 300, life: 0.6 });
+            ring(e.x + e.w / 2, e.y + e.h / 2, '#ff7a3d', 60);
+            Game.shake = Math.max(Game.shake, 8);
+            Sound.play('boom');
+            if (!p.dead && p.spawnT <= 0 && Math.hypot(dx, dy) < 58) killPlayer();
+          }
+        }
+        break;
+
+      case 'turtle':
+        groundMove(L, e, dt);
+        break;
+
+      case 'ninja':
+        groundMove(L, e, dt, false);
+        if (e.grounded) {
+          e.vx = 0;
+          e.timer -= dt;
+          if (near) e.face = dx > 0 ? 1 : -1;
+          if (e.timer <= 0 && near) {
+            const ahead = Math.floor((e.x + e.w / 2 + e.face * 90) / TILE);
+            e.vx = L.solid(ahead, Math.floor((e.y + e.h + 4) / TILE)) ? e.face * 120 : 0;
+            e.vy = -650; e.grounded = false; e.thrown = false;
+            e.timer = rand(1.4, 2.4);
+          }
+        } else if (!e.thrown && e.vy > -60) {
+          e.thrown = true;
+          const a = Math.atan2(dy, dx);
+          L.bullets.push({ kind: 'shuriken', x: e.x + e.w / 2, y: e.y + 8, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270, r: 6, life: 3 });
+          Sound.play('throw');
+        }
+        break;
+
+      case 'shade':
+        // тень-клон: быстро бежит к роботу и прыгает
+        if (e.grounded && near && Math.sign(dx) !== Math.sign(e.vx) && Math.abs(dx) > 30) e.vx = -e.vx;
+        if (e.grounded && near && dy < -TILE && Math.random() < dt * 2) e.vy = -620;
+        groundMove(L, e, dt);
+        if (Math.random() < dt * 20) emit(e.x + e.w / 2, e.y + e.h / 2, 1, { color: 'rgba(120,60,200,0.5)', speed: 20, grav: -40, life: 0.4, size: 5 });
+        break;
+
       case 'dropper':
         if (e.state === 'shake') {
           e.timer -= dt;
@@ -306,10 +385,20 @@ function updateEnemies(L, p, dt) {
   }
 }
 
+// Луч глаза-лазера: до 6 блоков или до стены
+function eyeBeam(L, e) {
+  const y = e.y + 9, cy = Math.floor(y / TILE);
+  let len = 0;
+  const x0 = e.face > 0 ? e.x + e.w : e.x;
+  while (len < TILE * 6 && !L.solid(Math.floor((x0 + e.face * (len + 4)) / TILE), cy)) len += 4;
+  return e.face > 0 ? { x: x0, y: y - 4, w: len, h: 8 } : { x: x0 - len, y: y - 4, w: len, h: 8 };
+}
+
 function killEnemy(e, p, stomped) {
   e.alive = false;
   e.deadT = stomped ? 0.5 : 1.2;
   e.deathMode = stomped ? 'squash' : 'fly';
+  if (e.type === 'eye') e.state = 'idle';
   e.dvx = (p ? Math.sign(e.x - p.x) || 1 : (Math.random() < 0.5 ? -1 : 1)) * rand(120, 220);
   e.dvy = -rand(380, 480);
   e.rot = 0;
@@ -338,6 +427,12 @@ function enemyContact(L, p, dt) {
     const fromAbove = p.vy > 0 && (p.y + p.h) - p.vy * dt <= e.y + 10;
     if (p.star > 0) { killEnemy(e, p, false); continue; }
     if (p.pound && fromAbove && info.dash) { p.pound = false; killEnemy(e, p, true); continue; }
+    if (e.type === 'turtle' && p.dashT > 0 && Math.sign(p.x + p.w / 2 - (e.x + e.w / 2)) === e.face) {
+      p.dashT = 0; p.vx = -p.dashDir * 320; p.vy = -300; p.wallLock = 0.25;
+      Sound.play('ding');
+      emit(e.x + e.w / 2 + e.face * 14, e.y + 8, 8, { color: ['#ffd54a', '#fff'], speed: 160, life: 0.3 });
+      continue;
+    }
     if (e.type === 'snail' && p.dashT <= 0) {
       if (snailContact(L, e, p, fromAbove)) return true;
       continue;
@@ -432,16 +527,24 @@ function updateBullets(L, p, dt) {
       if (dead) L.bullets.splice(i, 1);
       continue;
     }
+    if (b.kind === 'barrel') {
+      // бочка катится по земле
+      b.vy = Math.min(b.vy + 1400 * dt, 900);
+      const ty = Math.floor((b.y + b.r) / TILE);
+      if (L.solid(Math.floor(b.x / TILE), ty)) { b.y = ty * TILE - b.r; b.vy = 0; }
+      if (L.solid(Math.floor((b.x + Math.sign(b.vx) * b.r) / TILE), Math.floor(b.y / TILE))) dead = true;
+      b.rot = (b.rot || 0) + b.vx * dt / b.r;
+    }
     if (b.kind === 'wave') {
       const tx = Math.floor((b.x + (b.vx > 0 ? b.w : 0)) / TILE), ty = Math.floor((b.y + b.h - 2) / TILE);
       if (L.solid(tx, ty) || !L.solid(tx, ty + 1)) dead = true;
       if (!dead && !p.dead && p.spawnT <= 0 && overlap(p, { x: b.x + 3, y: b.y + 6, w: b.w - 6, h: b.h - 6 })) killPlayer();
     } else {
-      if (b.y > 0 && L.solid(Math.floor(b.x / TILE), Math.floor(b.y / TILE))) dead = true;
+      if (b.kind !== 'barrel' && b.y > 0 && L.solid(Math.floor(b.x / TILE), Math.floor(b.y / TILE))) dead = true;
       if (!dead && !p.dead) {
         const cx = clamp(b.x, p.x + 2, p.x + p.w - 2), cy = clamp(b.y, p.y + 2, p.y + p.h);
         if ((b.x - cx) ** 2 + (b.y - cy) ** 2 < (b.r + 2) ** 2) {
-          if ((b.kind === 'rocket' && p.vy > 0 && p.y + p.h - p.vy * dt <= b.y + 4) || p.star > 0) {
+          if (((b.kind === 'rocket' || b.kind === 'barrel') && p.vy > 0 && p.y + p.h - p.vy * dt <= b.y + 4) || p.star > 0) {
             bounceOff(p); dead = true; Sound.play('stomp'); Game.level.bonus++; floatText(b.x, b.y - 8, '+1', '#ffd54a', 'coin');
           } else if (p.spawnT <= 0) { killPlayer(); dead = true; }
         }
@@ -487,6 +590,25 @@ function drawBullets(L, t) {
       ctx.moveTo(b.x, b.y + b.h);
       ctx.quadraticCurveTo(b.x + b.w / 2, b.y - 6 + Math.sin(t * 30) * 3, b.x + b.w, b.y + b.h);
       ctx.fill();
+      continue;
+    }
+    if (b.kind === 'shuriken') {
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(t * 20);
+      ctx.fillStyle = '#c9d1e0';
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, r = k % 2 ? 2.5 : 8; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2b2f40'; ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (b.kind === 'barrel') {
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot || 0);
+      ctx.fillStyle = '#a0663a'; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#5c3a1e'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, b.r - 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-b.r + 3, 0); ctx.lineTo(b.r - 3, 0); ctx.moveTo(0, -b.r + 3); ctx.lineTo(0, b.r - 3); ctx.stroke();
+      ctx.restore();
       continue;
     }
     if (b.kind === 'rocket') {
@@ -773,6 +895,81 @@ function drawEnemy(e, t) {
       ctx.fillStyle = charge ? '#ff3b3b' : '#8ff7ff';
       ctx.beginPath(); ctx.arc(0, -2, 3, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+      break;
+    }
+    case 'eye': {
+      const charge = e.state === 'charge', fire = e.state === 'fire';
+      ctx.fillStyle = '#3a3f55'; roundRect(ctx, -12, -8, 24, 8, 3); ctx.fill();
+      ctx.fillStyle = '#5a6078'; ctx.fillRect(-3, -14, 6, 7);
+      ctx.fillStyle = '#e8ecf4'; ctx.beginPath(); ctx.arc(0, -17, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = charge || fire ? '#ff3b5c' : '#3a7ab0';
+      ctx.beginPath(); ctx.arc(face * 3, -17, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(face * 4, -17, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5a6078';
+      ctx.fillRect(-10, -27 + (charge ? 3 : 0), 20, 3);
+      ctx.restore();
+      ctx.save();
+      if (charge || fire) {
+        const bm = eyeBeam(Game.level, e);
+        if (charge) {
+          ctx.globalAlpha = 0.35 + 0.4 * Math.abs(Math.sin(t * 20));
+          ctx.strokeStyle = '#ff3b5c'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+          ctx.beginPath(); ctx.moveTo(bm.x, bm.y + 4); ctx.lineTo(bm.x + bm.w, bm.y + 4); ctx.stroke(); ctx.setLineDash([]);
+        } else {
+          ctx.fillStyle = 'rgba(255,60,92,0.35)'; ctx.fillRect(bm.x, bm.y - 4, bm.w, bm.h + 8);
+          ctx.fillStyle = '#ff3b5c'; ctx.fillRect(bm.x, bm.y, bm.w, bm.h);
+          ctx.fillStyle = '#fff'; ctx.fillRect(bm.x, bm.y + 3, bm.w, 2);
+        }
+      }
+      break;
+    }
+    case 'mine': {
+      const armed = e.state === 'arm';
+      ctx.translate(0, -e.h / 2);
+      ctx.fillStyle = '#4a5068';
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + e.t * 0.5; ctx.fillRect(Math.cos(a) * 11 - 2, Math.sin(a) * 11 - 2, 4, 4); }
+      ctx.fillStyle = '#5a6078'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(-3, -3, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = armed && Math.sin(t * 40) > 0 ? '#ff3b3b' : armed ? '#ffd54a' : '#7a2a2a';
+      ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, Math.PI * 2); ctx.fill();
+      if (armed) { ctx.strokeStyle = 'rgba(255,60,60,0.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 58 * (1 - e.timer / 0.8), 0, Math.PI * 2); ctx.stroke(); }
+      break;
+    }
+    case 'turtle': {
+      ctx.scale(face, 1);
+      const step = Math.sin(e.t * 6) * 1.5;
+      ctx.fillStyle = '#7ad07a';
+      ctx.fillRect(-11 + step, -5, 6, 5); ctx.fillRect(4 - step, -5, 6, 5);
+      roundRect(ctx, 8, -14, 9, 8, 4); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.fillRect(13, -12, 2, 2);
+      ctx.fillStyle = '#3a9a5a';
+      ctx.beginPath(); ctx.ellipse(-2, -9, 13, 10, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(-15, -9, 26, 4);
+      ctx.strokeStyle = '#2a6a3a'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-8, -9); ctx.lineTo(-4, -16); ctx.lineTo(4, -16); ctx.lineTo(7, -9); ctx.stroke();
+      // щит спереди
+      ctx.fillStyle = '#c9d1e0';
+      ctx.beginPath(); ctx.moveTo(17, -22); ctx.quadraticCurveTo(25, -12, 17, -1); ctx.lineTo(15, -1); ctx.quadraticCurveTo(21, -12, 15, -22); ctx.fill();
+      ctx.fillStyle = '#ffd54a'; ctx.fillRect(18, -13, 3, 3);
+      break;
+    }
+    case 'ninja': {
+      ctx.scale(face, 1);
+      const air = !e.grounded;
+      ctx.fillStyle = '#1b1e2b';
+      if (air) { ctx.fillRect(-8, -9, 5, 7); ctx.fillRect(3, -11, 5, 7); }
+      else { ctx.fillRect(-8, -6, 5, 6); ctx.fillRect(3, -6, 5, 6); }
+      ctx.fillStyle = '#2b2f40'; roundRect(ctx, -10, -24, 20, 19, 6); ctx.fill();
+      ctx.fillStyle = '#e8ecf4'; ctx.fillRect(-6, -19, 14, 5);
+      ctx.fillStyle = '#ff3b3b'; ctx.fillRect(2, -18, 3, 3);
+      ctx.fillStyle = '#e02b3a'; ctx.fillRect(-10, -22, 20, 3);
+      ctx.beginPath(); ctx.moveTo(-10, -21); ctx.lineTo(-18, -24 + Math.sin(e.t * 12) * 3); ctx.lineTo(-17, -18 + Math.sin(e.t * 12 + 1) * 3); ctx.fill();
+      break;
+    }
+    case 'shade': {
+      ctx.restore();
+      ctx.save();
+      const pose = { w: e.w, h: e.h, face, sx: 1, sy: 1, vx: e.vx, onGround: e.grounded, runPhase: e.t * 16, blinkT: 1, canDash: false, dashCD: 1 };
+      drawRobot(pose, e.x, e.y, 0.9, false, ctx, SHADOW_SKIN);
       break;
     }
     case 'dropper': {

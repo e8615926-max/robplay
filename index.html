@@ -32,10 +32,43 @@
   </div>
 
   <div id="toast" class="hidden"></div>
+  <div id="ach-pop" class="hidden"></div>
+
+  <!-- Знакомство -->
+  <section id="screen-welcome" class="screen hidden">
+    <div class="panel">
+      <h1 class="logo">Rob<span>Play</span></h1>
+      <h2 data-t="hello"></h2>
+      <p class="hint" data-t="whatName"></p>
+      <input id="name-input" type="text" maxlength="16" autocomplete="off" class="name-input">
+      <button class="btn primary big" data-action="create-player"><i data-ic="play"></i><span data-t="start"></span></button>
+      <button class="btn" data-action="profiles" id="welcome-back"><i data-ic="back"></i><span data-t="back"></span></button>
+    </div>
+  </section>
+
+  <!-- Игроки -->
+  <section id="screen-profiles" class="screen hidden">
+    <div class="panel wide">
+      <h2><i data-ic="robot"></i><span data-t="players"></span></h2>
+      <div id="profile-list" class="profile-list"></div>
+      <button class="btn primary" data-action="new-player"><i data-ic="upgrade"></i><span data-t="newPlayer"></span></button>
+      <h3><i data-ic="trophy"></i> <span data-t="leaderboard"></span></h3>
+      <table id="leaderboard" class="leaderboard"></table>
+      <h3 data-t="transfer"></h3>
+      <p class="hint" data-t="transferHint"></p>
+      <textarea id="save-code" class="save-code" rows="3" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn small" data-action="copy-code"><span data-t="copyCode"></span></button>
+        <button class="btn small" data-action="load-code"><span data-t="loadCode"></span></button>
+      </div>
+      <button class="btn" data-action="menu"><i data-ic="back"></i><span data-t="back"></span></button>
+    </div>
+  </section>
 
   <!-- Главное меню -->
   <section id="screen-menu" class="screen">
     <div class="panel menu-panel">
+      <button class="player-chip" data-action="profiles"><canvas id="menu-avatar" width="48" height="48"></canvas><span id="menu-player"></span><small data-t="change"></small></button>
       <h1 class="logo">Rob<span>Play</span></h1>
       <p class="subtitle" data-t="subtitle"></p>
       <div class="menu-badges">
@@ -127,9 +160,11 @@
 
   <!-- Статистика -->
   <section id="screen-stats" class="screen hidden">
-    <div class="panel">
+    <div class="panel wide">
       <h2><i data-ic="chart"></i><span data-t="stTitle"></span></h2>
       <div class="stats" id="stats-list"></div>
+      <h3><i data-ic="trophy"></i> <span data-t="achievements"></span> <small id="ach-count"></small></h3>
+      <div id="ach-list" class="ach-list"></div>
       <button class="btn" data-action="menu"><i data-ic="back"></i><span data-t="back"></span></button>
     </div>
   </section>
@@ -198,6 +233,7 @@
   <script src="levels.js"></script>
   <script src="icons.js"></script>
   <script src="i18n.js"></script>
+  <script src="profiles.js"></script>
   <script src="enemies.js"></script>
   <script src="boss.js"></script>
   <script src="fx.js"></script>

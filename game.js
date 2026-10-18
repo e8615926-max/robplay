@@ -32,6 +32,8 @@ const THEMES = [
   { sky: ['#05030f', '#1b1440'], ground: '#3a3550', top: '#c08cff', topDark: '#7a4fc0', mount: '#120c2a', mount2: '#1a1238', far: 'stars', fx: 'space' },
   { sky: ['#6fb8ff', '#ffe6c2'], ground: '#c9a35a', top: '#ffffff', topDark: '#f0d9a0', mount: '#fdf3e4', mount2: '#ffffff', far: 'clouds', fx: 'feathers' },
   { sky: ['#01040c', '#062033'], ground: '#0b1a2a', top: '#00ffc8', topDark: '#00a080', mount: '#061c2a', mount2: '#08263a', far: 'stars', fx: 'digital' },
+  { sky: ['#2f7a52', '#c8eea0'], ground: '#5a3a1e', top: '#3fbf3f', topDark: '#2a8a2a', mount: '#2a6a3a', mount2: '#3f8a4a', far: 'clouds', fx: 'leaves' },
+  { sky: ['#07040c', '#2a0f30'], ground: '#2a2433', top: '#8a5aff', topDark: '#4a2a8a', mount: '#130a1c', mount2: '#1c1028', far: 'stars', fx: 'ash', noSun: true },
 ];
 
 // ---------- Утилиты ----------
@@ -55,26 +57,37 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ---------- Сохранение ----------
-const Save = {
-  data: {
+// Сохранение текущего игрока (у каждого профиля своё)
+function defaultSave() {
+  return {
     unlocked: 1, best: {}, muted: false, music: true,
     wallet: 0, skin: 'classic', skins: ['classic'], champion: false,
     sfxVol: 1, musicVol: 1, shake: true, wheel: null, lang: null, menuStyle: 'neon',
     abil: { equipped: 'dash', lv: { dash: 1 }, pas: {} },
     stats: { coins: 0, deaths: 0, kills: 0, bosses: 0, time: 0, completed: 0 },
-  },
+    ach: {}, flags: {},
+  };
+}
+const Save = {
+  data: defaultSave(),
   load() {
+    const lang = this.data.lang;
+    this.data = defaultSave();
     try {
-      const d = JSON.parse(localStorage.getItem('robplay-save'));
+      const d = JSON.parse(localStorage.getItem(Profiles.saveKey()));
       if (d) {
         const stats = Object.assign({}, this.data.stats, d.stats);
         Object.assign(this.data, d);
         this.data.stats = stats;
+        this.data.ach = this.data.ach || {};
+        this.data.flags = this.data.flags || {};
       }
     } catch (e) { /* хранилище недоступно */ }
+    if (!this.data.lang) this.data.lang = lang;
   },
   store() {
-    try { localStorage.setItem('robplay-save', JSON.stringify(this.data)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(Profiles.saveKey(), JSON.stringify(this.data)); } catch (e) { /* ignore */ }
+    Profiles.touch();
   },
 };
 
@@ -108,6 +121,16 @@ const TRACKS = {
     chords: [[60, 63, 67], [56, 60, 63], [63, 67, 70], [58, 62, 65]],
     lead: [72, 75, 79, 0, 75, 72, 0, 0, 68, 72, 75, 0, 80, 79, 75, 0, 75, 79, 82, 0, 79, 75, 0, 0, 70, 74, 77, 0, 82, 0, 77, 0],
   },
+  w6: {
+    eighth: 0.19, arpType: 'triangle', leadType: 'sine', bassType: 'sine', drums: true,
+    chords: [[62, 66, 69], [59, 62, 66], [57, 61, 64], [55, 59, 62]],
+    lead: [74, 76, 78, 0, 81, 0, 78, 76, 74, 0, 71, 0, 74, 0, 0, 0, 78, 81, 83, 0, 81, 78, 76, 0, 74, 76, 74, 71, 69, 0, 0, 0],
+  },
+  w7: {
+    eighth: 0.22, arpType: 'sawtooth', leadType: 'square', bassType: 'sawtooth', drums: true, heavy: true,
+    chords: [[57, 60, 64], [53, 56, 60], [50, 53, 57], [52, 56, 59]],
+    lead: [81, 0, 80, 81, 84, 0, 81, 0, 77, 0, 76, 77, 81, 0, 0, 0, 74, 0, 77, 81, 80, 0, 76, 0, 80, 0, 83, 0, 88, 0, 0, 0],
+  },
   w3: {
     eighth: 0.18, arpType: 'sawtooth', leadType: 'square', bassType: 'sawtooth', drums: true,
     chords: [[64, 67, 71], [60, 64, 67], [57, 60, 64], [59, 63, 66]],
@@ -135,6 +158,8 @@ const AMBIENT = {
   sparks: { type: 'lowpass', freq: 200, q: 6, vol: 0.06 },
   digital: { type: 'bandpass', freq: 3000, q: 8, vol: 0.03, wobble: true },
   feathers: { type: 'lowpass', freq: 600, q: 1, vol: 0.07, wobble: true },
+  ash: { type: 'lowpass', freq: 220, q: 2, vol: 0.1, wobble: true },
+  leaves: { type: 'highpass', freq: 4000, q: 1, vol: 0.012 },
   fireflies: { type: 'highpass', freq: 5000, q: 1, vol: 0.015 },
 };
 
@@ -252,6 +277,9 @@ const Sound = {
       case 'win': [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, 0.25, 'square', 0.14, 0, i * 0.1)); break;
       case 'jackpot': [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.3, 'square', 0.13, 0, i * 0.07)); this.noise(0.6, 0.15, 6000, 0.4, this.sfxBus, 0, 'highpass'); break;
       case 'click': this.tone(660, 0.05, 'square', 0.08); break;
+      case 'beep': this.tone(1600, 0.06, 'square', 0.08); break;
+      case 'achievement': [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 0.22, 'triangle', 0.16, 0, i * 0.08)); this.noise(0.4, 0.08, 7000, 0.25, this.sfxBus, 0, 'highpass'); break;
+      case 'chest': this.tone(90, 0.12, 'sine', 0.4, 50); this.noise(0.1, 0.2, 400); break;
       case 'hover': this.tone(1200, 0.03, 'sine', 0.04); break;
       case 'blip': this.tone(520 + Math.random() * 120, 0.04, 'square', 0.04); break;
       case 'step': this.noise(0.04, 0.06, 2500, 0, this.sfxBus, 0, 'highpass'); break;
@@ -391,7 +419,7 @@ class Level {
           case 'P': this.start = { x: px, y: py }; row[x] = ' '; break;
           case 'C': this.coins.push({ x: px + 8, y: py + 8, w: 16, h: 16, taken: false, phase: Math.random() * 6 }); row[x] = ' '; break;
           case 'E': case 'F': case 'S': case 'J': case 'H': case 'T': case 'W': case 'Q': case 'O': case 'D':
-          case 'N': case 'Y': case 'U': case 'A': case 'R':
+          case 'N': case 'Y': case 'U': case 'A': case 'R': case 'L': case 'I': case '1': case '2': case '3':
             this.enemies.push(makeEnemy(c, px, py)); row[x] = ' '; break;
           case 'Z': this.boss = makeBoss(def.boss || 1, px, py); row[x] = ' '; break;
           case '!': case '&': case '*': this.powerups.push(makePowerup(c, px, py)); row[x] = ' '; break;
@@ -517,7 +545,7 @@ function startLevel(i) {
   Game.iris = 0;
   snapCamera();
   Weather.init(Game.level);
-  Sound.setTrack(LEVELS[i].boss ? 'boss' : ['w1', 'w2', 'w3', 'w4', 'w5'][Math.min(4, Math.floor(i / 10))]);
+  Sound.setTrack(LEVELS[i].boss ? 'boss' : ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'][Math.min(6, Math.floor(i / 10))]);
   Sound.setAmbient(Game.level.def.theme === 5 ? 'embers' : Game.level.theme.fx);
   Game.rings = [];
   Game.coinCombo = 0; Game.coinT = 0;
@@ -596,7 +624,9 @@ function completeLevel() {
   const st = Save.data.stats;
   st.coins += reward; st.completed++; st.time += L.time;
   if (i === LEVELS.length - 1) Save.data.champion = true;
+  if (allCoins && L.deaths === 0) Save.data.flags.perfect = true;
   Save.store();
+  checkAchievements();
   Sound.play('win');
   const g = L.goal;
   for (let k = 0; k < 4; k++) {
@@ -1096,7 +1126,7 @@ function drawTiles(L, cam, t) {
 }
 
 // Узор блока по теме + затемнение в глубине
-const BLOCK_PATTERN = { 2: 'brick', 10: 'brick', 3: 'candy', 7: 'ice', 11: 'tech', 9: 'stone', 5: 'stone', 4: 'stone', 12: 'gold', 13: 'circuit' };
+const BLOCK_PATTERN = { 2: 'brick', 10: 'brick', 3: 'candy', 7: 'ice', 11: 'tech', 9: 'stone', 5: 'stone', 4: 'stone', 12: 'gold', 13: 'circuit', 14: 'stone', 15: 'brick' };
 function drawBlockPattern(L, tx, ty, x, y) {
   const pat = BLOCK_PATTERN[L.def.theme] || 'dirt';
   ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1;
@@ -1337,7 +1367,7 @@ function render(t) {
 // ============================================================
 const $ = id => document.getElementById(id);
 const STYLES = ['neon', 'retro', 'blocks', 'cartoon'];
-const BESTIARY = { walker: 'E', jumper: 'J', spiker: 'S', charger: 'H', turret: 'T', flyer: 'F', swooper: 'W', ghost: 'Q', saw: 'O', dropper: 'D', snail: 'N', slime: 'Y', spider: 'U', bomber: 'A', launcher: 'R' };
+const BESTIARY = { walker: 'E', jumper: 'J', spiker: 'S', charger: 'H', turret: 'T', flyer: 'F', swooper: 'W', ghost: 'Q', saw: 'O', dropper: 'D', snail: 'N', slime: 'Y', spider: 'U', bomber: 'A', launcher: 'R', eye: 'L', mine: 'I', turtle: '1', ninja: '2', shade: '3' };
 
 // Рисует на другом холсте теми же функциями отрисовки
 function renderTo(c, fn) {
@@ -1352,7 +1382,7 @@ const UI = {
   worldTab: 0,
 
   show(name) {
-    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats', 'wheel', 'upgrades']) {
+    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats', 'wheel', 'upgrades', 'welcome', 'profiles']) {
       $('screen-' + s).classList.toggle('hidden', s !== name);
     }
     this.shopOpen = name === 'shop';
@@ -1400,6 +1430,7 @@ const UI = {
           Save.data.skins.push(skin.id);
           Save.data.skin = skin.id;
           Save.store();
+          checkAchievements();
           Sound.play('buy');
           this.toast(`<span class="t-title">${T('newSkin')}</span>${tr(skin, 'name')} — ${T('isYours')}`, 2200);
         } else {
@@ -1439,7 +1470,7 @@ const UI = {
         this.toast(`${T('needMore')} ${ico('coin')}${cost - Save.data.wallet}`, 2000);
         return;
       }
-      Save.data.wallet -= cost; after(); Save.store(); Sound.play('buy'); this.buildUpgrades();
+      Save.data.wallet -= cost; after(); Save.store(); checkAchievements(); Sound.play('buy'); this.buildUpgrades();
     };
     $('up-active').innerHTML = '';
     for (const a of ABILITIES) {
@@ -1493,6 +1524,79 @@ const UI = {
     $('touch-ability').innerHTML = ico(a ? a.icon : 'dash');
   },
 
+  // ---------- Игроки ----------
+  avatar(canvas, skinId) {
+    const c = canvas.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    const k = canvas.width / 32;
+    c.scale(k, k);
+    drawRobot(previewPose(1, false), 5, 2, 1, false, c, skinById(skinId));
+  },
+  refreshPlayerChip() {
+    const p = Profiles.current();
+    if (!p) return;
+    $('menu-player').textContent = p.name;
+    this.avatar($('menu-avatar'), Save.data.skin);
+  },
+  showWelcome(adding) {
+    $('welcome-back').classList.toggle('hidden', !adding || !Profiles.data.list.length);
+    $('name-input').value = '';
+    this.show('welcome');
+    setTimeout(() => $('name-input').focus(), 50);
+  },
+  createPlayer() {
+    const name = $('name-input').value.trim();
+    if (!name) { $('name-input').focus(); Sound.play('error'); return; }
+    const lang = Save.data.lang, style = Save.data.menuStyle;
+    Profiles.create(name);
+    Save.load();
+    Save.data.lang = lang; Save.data.menuStyle = style;
+    Save.store();
+    afterPlayerChange(true);
+    this.toast(`<span class="t-title">${T('hello')}</span>${escapeHtml(name)}`, 2200);
+  },
+  buildProfiles() {
+    const list = $('profile-list');
+    list.innerHTML = '';
+    const fmtDate = ts => new Date(ts).toLocaleDateString(lang() === 'en' ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    for (const p of Profiles.data.list) {
+      const cur = p.id === Profiles.data.current;
+      const card = document.createElement('div');
+      card.className = 'profile-card' + (cur ? ' selected' : '');
+      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+      this.avatar(cv, p.skin);
+      card.appendChild(cv);
+      card.insertAdjacentHTML('beforeend', `<div class="pc-body"><b>${escapeHtml(p.name)}</b>
+        <span>${ico('star')}${p.stars} · ${ico('map')}${p.done} · ${ico('coin')}${p.coins}</span>
+        <small>${cur ? T('current') : T('lastPlayed') + ': ' + fmtDate(p.last)}</small></div><div class="pc-actions"></div>`);
+      const box = card.querySelector('.pc-actions');
+      const mk = (html, cls, fn) => {
+        const b = document.createElement('button'); b.className = 'btn small ' + cls; b.innerHTML = html;
+        b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); fn(); });
+        box.appendChild(b);
+      };
+      if (!cur) mk(ico('play') + T('play2'), 'primary', () => { Sound.play('click'); Profiles.select(p.id); afterPlayerChange(); });
+      mk(ico('edit'), 'icon-only', () => {
+        const n = prompt(T('renamePrompt'), p.name);
+        if (n) { Profiles.rename(p.id, n); this.buildProfiles(); this.refreshPlayerChip(); }
+      });
+      mk(ico('trash'), 'icon-only danger', () => {
+        if (!confirm(T('deleteConfirm'))) return;
+        Profiles.remove(p.id);
+        if (!Profiles.current()) { this.showWelcome(false); return; }
+        Save.load(); afterPlayerChange(true);
+        this.buildProfiles(); this.show('profiles');
+      });
+      list.appendChild(card);
+    }
+    const rank = Profiles.ranking();
+    $('leaderboard').innerHTML = `<tr><th>#</th><th>${T('colPlayer')}</th><th>${ico('star')}</th><th>${ico('map')}</th><th>${ico('coin')}</th></tr>` +
+      rank.map((p, i) => `<tr class="${p.id === Profiles.data.current ? 'me' : ''}"><td>${i === 0 ? ico('trophy') : i + 1}</td>
+        <td>${escapeHtml(p.name)}</td><td>${p.stars}</td><td>${p.done}</td><td>${p.earned}</td></tr>`).join('');
+    $('save-code').value = '';
+  },
+
   // ---------- Справочник врагов ----------
   buildBestiary() {
     const box = $('bestiary');
@@ -1510,6 +1614,7 @@ const UI = {
       if (e.type === 'saw') { e.cx = 28; e.cy = 24; e.x = 14; e.y = 10; }
       else if (e.type === 'spider') { e.x = 16; e.y = 16; e.anchor = 0; }
       else if (e.type === 'dropper') { e.x = 13; e.x0 = 13; e.y = 4; e.y0 = 200; }
+      else if (e.type === 'mine') { e.x = 17; e.y = 12; }
       else { e.x = 28 - e.w / 2; e.y = 40 - e.h; }
       renderTo(c, () => drawEnemy(e, 1.3));
       item.appendChild(cv);
@@ -1538,6 +1643,10 @@ const UI = {
       ['palette', 'stSkins', `${Save.data.skins.length + (Save.data.champion && !Save.data.skins.includes('champion') ? 1 : 0)} / ${SKINS.length}`],
     ];
     $('stats-list').innerHTML = rows.map(([icon, k, v]) => `<span>${ico(icon)}${T(k)}</span><b>${v}</b>`).join('');
+    const ach = Save.data.ach || {};
+    $('ach-count').textContent = `${Object.keys(ach).length} / ${ACHIEVEMENTS.length}`;
+    $('ach-list').innerHTML = ACHIEVEMENTS.map(a => `<div class="ach ${ach[a.id] ? 'on' : ''}">${ico(ach[a.id] ? a.icon : 'lock')}
+      <div><b>${tr(a, 'name')}</b><span>${tr(a, 'desc')}</span></div></div>`).join('');
   },
 
   // ---------- Настройки ----------
@@ -1668,6 +1777,20 @@ const UI = {
   },
 };
 
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+
+// После смены игрока — применить его язык, стиль и обновить меню
+function afterPlayerChange(silent) {
+  applyLang();
+  applyStyle();
+  UI.refreshToggles();
+  UI.refreshAbilityButton();
+  Sound.apply();
+  goMenu();
+  const p = Profiles.current();
+  if (p && !silent) UI.toast(`<span class="t-title">${T('welcomeBack')}, ${escapeHtml(p.name)}!</span>`, 2200);
+}
+
 function applyStyle() {
   const s = STYLES.includes(Save.data.menuStyle) ? Save.data.menuStyle : 'neon';
   document.body.className = 'style-' + s;
@@ -1702,6 +1825,7 @@ function goMenu() {
   setState('menu');
   UI.hideToast();
   UI.refreshMenu();
+  UI.refreshPlayerChip();
   UI.show('menu');
 }
 
@@ -1724,13 +1848,34 @@ function handleAction(a) {
       break;
     case 'howto': UI.buildBestiary(); UI.show('howto'); break;
     case 'upgrades': UI.buildUpgrades(); UI.show('upgrades'); break;
+    case 'profiles': UI.buildProfiles(); UI.show('profiles'); break;
+    case 'new-player': UI.showWelcome(true); break;
+    case 'create-player': UI.createPlayer(); break;
+    case 'copy-code': {
+      const code = Profiles.exportCode();
+      $('save-code').value = code;
+      $('save-code').select();
+      try { navigator.clipboard.writeText(code).catch(() => {}); } catch (e) { /* ignore */ }
+      UI.toast(T('codeCopied'), 1800);
+      break;
+    }
+    case 'load-code':
+      try {
+        Profiles.importCode($('save-code').value);
+        afterPlayerChange();
+        UI.toast(T('codeLoaded'), 2000);
+      } catch (e) { Sound.play('error'); UI.toast(T('codeError'), 2000); }
+      break;
     case 'shop': UI.buildShop(); UI.show('shop'); break;
     case 'stats': UI.buildStats(); UI.show('stats'); break;
     case 'settings': UI.buildSettings(); UI.show('settings'); break;
     case 'reset':
       if (confirm(T('resetConfirm'))) {
-        try { localStorage.removeItem('robplay-save'); } catch (e) { /* ignore */ }
-        location.reload();
+        const { lang: lg, menuStyle } = Save.data;
+        Save.data = defaultSave();
+        Save.data.lang = lg; Save.data.menuStyle = menuStyle;
+        Save.store();
+        afterPlayerChange(true);
       }
       break;
     case 'menu': goMenu(); break;
@@ -1764,6 +1909,11 @@ $('set-music').addEventListener('input', e => { Save.data.musicVol = e.target.va
 $('set-shake').addEventListener('change', e => { Save.data.shake = e.target.checked; Save.store(); });
 
 window.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'text') {
+    if (e.code === 'Enter' && e.target.id === 'name-input') handleAction('create-player');
+    return;
+  }
+  if (e.target && e.target.tagName === 'TEXTAREA') return;
   const a = KEYMAP[e.code];
   if (a) {
     if (!Input.keys[a]) Input.latch[a] = true;
@@ -1844,8 +1994,9 @@ function frame(now) {
 }
 
 // ---------- Запуск ----------
+Save.data.lang = (navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en';
+Profiles.load();
 Save.load();
-if (!Save.data.lang) Save.data.lang = (navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en';
 renderIcons();
 applyLang();
 applyStyle();
@@ -1853,7 +2004,9 @@ resize();
 UI.refreshToggles();
 UI.refreshAbilityButton();
 goMenu();
+if (!Profiles.current()) UI.showWelcome(false);
+else UI.toast(`<span class="t-title">${T('welcomeBack')}, ${escapeHtml(Profiles.current().name)}!</span>`, 2600);
 requestAnimationFrame(frame);
 
 // Для отладки и автотестов
-window.RobPlay = { Game, startLevel, LEVELS, Save, Input, updateWorld, STEP, TILE, makeEnemy, UI };
+window.RobPlay = { Game, startLevel, LEVELS, Save, Input, updateWorld, STEP, TILE, makeEnemy, UI, Profiles };

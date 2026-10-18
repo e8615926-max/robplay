@@ -9,6 +9,8 @@ const BOSS_INFO = {
   3: { name: 'Ядро Хаоса', name_en: 'Chaos Core', hp: 8, w: 64, h: 64 },
   4: { name: 'Механический Змей', name_en: 'Mecha Serpent', hp: 7, w: 44, h: 38 },
   5: { name: 'Омега', name_en: 'Omega', hp: 10, w: 76, h: 76 },
+  6: { name: 'Король Джунглей', name_en: 'Jungle King', hp: 9, w: 72, h: 64 },
+  7: { name: 'Тёмный Роб', name_en: 'Shadow Rob', hp: 12, w: 30, h: 38 },
 };
 
 function makeBoss(kind, px, py) {
@@ -24,7 +26,8 @@ function makeBoss(kind, px, py) {
 }
 
 function bossVulnerable(b) {
-  return b.kind === 1 || ((b.kind === 2 || b.kind === 4) && b.state === 'stunned') || ((b.kind === 3 || b.kind === 5) && b.state === 'tired');
+  if (b.kind === 7) return b.state !== 'dash' && b.state !== 'windup';
+  return b.kind === 1 || ((b.kind === 2 || b.kind === 4) && b.state === 'stunned') || ((b.kind === 3 || b.kind === 5 || b.kind === 6) && b.state === 'tired');
 }
 
 // Наземная физика (Громобот)
@@ -67,10 +70,10 @@ function updateBoss(L, b, p, dt) {
   const dx = pcx - (b.x + b.w / 2);
 
   if (b.state === 'intro') {
-    if (b.kind === 1) bossGround(L, b, dt);
+    if (b.kind === 1 || b.kind === 6 || b.kind === 7) bossGround(L, b, dt);
     b.timer -= dt;
     if (b.timer <= 0) {
-      b.state = b.kind === 1 ? 'walk' : (b.kind === 2 || b.kind === 4) ? 'rise' : 'float';
+      b.state = b.kind === 1 || b.kind === 6 ? 'walk' : b.kind === 7 ? 'chase' : (b.kind === 2 || b.kind === 4) ? 'rise' : 'float';
       b.timer = 1.5;
     }
     return;
@@ -252,6 +255,10 @@ function updateBoss(L, b, p, dt) {
       if (b.timer <= 0) { b.state = 'rise'; Sound.play('roar'); }
     }
     updateSegments(L, b, dt);
+  } else if (b.kind === 6) {
+    updateJungleKing(L, b, p, dt, pcx, dx);
+  } else if (b.kind === 7) {
+    updateShadowRob(L, b, p, dt, pcx, dx);
   } else {
     // ---------- Омега: лазеры, залпы, призыв, удар о землю, усталость
     const rage = b.hp <= 5;
@@ -339,6 +346,130 @@ function updateBoss(L, b, p, dt) {
   }
 }
 
+// ---------- Король Джунглей: бочки, прыжок через арену, удары в грудь
+function updateJungleKing(L, b, p, dt, pcx, dx) {
+  const rage = b.hp <= 4;
+  const landed = bossGround(L, b, dt);
+  if (b.state === 'walk') {
+    b.face = dx > 0 ? 1 : -1;
+    b.vx = Math.abs(dx) > 40 ? b.face * (rage ? 90 : 60) : 0;
+    b.timer -= dt;
+    if (b.timer <= 0) {
+      b.state = ['barrels', 'leap', 'pound'][b.attackN % 3];
+      b.attackN++;
+      b.vx = 0; b.shot = 0.3; b.count = 0;
+      b.timer = b.state === 'pound' ? 1.3 : 0;
+    }
+  } else if (b.state === 'barrels') {
+    b.vx = 0;
+    b.shot -= dt;
+    if (b.shot <= 0) {
+      b.face = dx > 0 ? 1 : -1;
+      L.bullets.push({ kind: 'barrel', x: b.x + b.w / 2 + b.face * 30, y: b.y + b.h - 13, vx: b.face * (rage ? 250 : 200), vy: 0, r: 13, life: 6 });
+      Sound.play('throw');
+      b.count++;
+      b.shot = rage ? 0.5 : 0.75;
+      if (b.count >= (rage ? 4 : 3)) { b.state = 'walk'; b.timer = 1.2; }
+    }
+  } else if (b.state === 'leap') {
+    if (b.grounded && !b.leaping) {
+      const tx = b.x + b.w / 2 < L.w / 2 ? L.w - TILE * 6 : TILE * 6;
+      b.vx = (tx - (b.x + b.w / 2)) / 1.0; b.vy = -900; b.grounded = false; b.leaping = true;
+      Sound.play('bossJump');
+    } else if (landed && b.leaping) {
+      b.leaping = false; b.vx = 0;
+      shockwaves(L, b, rage ? 320 : 260);
+      Game.shake = Math.max(Game.shake, 12); Sound.play('thud');
+      for (let k = 0; k < (rage ? 6 : 4); k++) {
+        L.bullets.push({ kind: 'bomb', x: rand(TILE * 3, L.w - TILE * 3), y: Game.cam.y - 20 - k * 60, vx: 0, vy: 0, grav: 700, r: 8, life: 5 });
+      }
+      b.state = 'walk'; b.timer = 1.5;
+    }
+  } else if (b.state === 'pound') {
+    b.vx = 0;
+    b.timer -= dt;
+    if (Math.floor(b.timer * 6) !== Math.floor((b.timer + dt) * 6)) { Sound.play('chest'); Game.shake = Math.max(Game.shake, 3); }
+    if (b.timer <= 0) {
+      for (let k = 0; k < (rage ? 8 : 6); k++) {
+        L.bullets.push({ kind: 'bomb', x: rand(TILE * 2, L.w - TILE * 2), y: Game.cam.y - 20 - k * 50, vx: 0, vy: 0, grav: 650, r: 8, life: 5 });
+      }
+      b.state = 'tired'; b.timer = rage ? 2 : 2.6;
+    }
+  } else if (b.state === 'tired') {
+    b.vx = 0;
+    b.timer -= dt;
+    if (b.timer <= 0) { b.state = 'walk'; b.timer = 1.4; }
+  }
+}
+
+// ---------- Тёмный Роб: копия робота с рывком, бластером и телепортом
+function updateShadowRob(L, b, p, dt, pcx, dx) {
+  const rage = b.hp <= 6;
+  const landed = bossGround(L, b, dt);
+  if (landed) emit(b.x + b.w / 2, b.y + b.h, 6, { color: 'rgba(160,90,255,0.6)', speed: 80, grav: 100, life: 0.3 });
+  if (Math.random() < dt * 25) emit(b.x + rand(0, b.w), b.y + rand(0, b.h), 1, { color: 'rgba(140,70,240,0.5)', speed: 20, grav: -60, life: 0.5, size: 5 });
+  if (rage && !b.cloned) {
+    b.cloned = true;
+    for (const side of [-1, 1]) {
+      const e = makeEnemy('3', b.x + side * 60, b.y);
+      e.y = b.groundY + b.h - e.h; L.enemies.push(e);
+      emit(e.x + e.w / 2, e.y + e.h / 2, 16, { color: ['#8a3aff', '#fff'], speed: 200, life: 0.5 });
+    }
+    Sound.play('summon');
+  }
+  const pyc = p.y + p.h / 2;
+  if (b.state === 'chase') {
+    b.face = dx > 0 ? 1 : -1;
+    b.vx = Math.abs(dx) > 24 ? b.face * (rage ? 230 : 190) : 0;
+    if (b.grounded && (pyc < b.y - TILE || L.solid(Math.floor((b.x + b.w / 2 + b.face * 26) / TILE), Math.floor((b.y + b.h / 2) / TILE)))) { b.vy = -700; b.grounded = false; }
+    b.timer -= dt;
+    if (b.timer <= 0) {
+      const acts = rage ? ['windup', 'shoot', 'blink', 'windup'] : ['windup', 'shoot', 'windup', 'blink'];
+      b.state = acts[b.attackN % acts.length]; b.attackN++;
+      b.timer = b.state === 'windup' ? 0.45 : 0;
+      b.vx = 0;
+    }
+  } else if (b.state === 'windup') {
+    b.vx = 0;
+    b.timer -= dt;
+    if (b.timer <= 0) { b.state = 'dash'; b.timer = 0.42; b.face = dx > 0 ? 1 : -1; Sound.play('dash'); }
+  } else if (b.state === 'dash') {
+    b.vx = b.face * (rage ? 720 : 620); b.vy = Math.min(b.vy, 0);
+    b.trail = b.trail || [];
+    b.trail.push({ x: b.x, y: b.y, life: 0.25 });
+    b.timer -= dt;
+    const hitWall = L.solid(Math.floor((b.x + (b.face > 0 ? b.w + 2 : -2)) / TILE), Math.floor((b.y + b.h / 2) / TILE));
+    if (hitWall || b.timer <= 0) {
+      b.vx = 0;
+      b.state = 'stunned'; b.timer = hitWall ? 1.2 : 0.7;
+      if (hitWall) { Game.shake = Math.max(Game.shake, 8); Sound.play('thud'); }
+    }
+  } else if (b.state === 'shoot') {
+    b.face = dx > 0 ? 1 : -1;
+    const a0 = Math.atan2(pyc - (b.y + 14), pcx - (b.x + b.w / 2));
+    for (const da of rage ? [-0.25, 0, 0.25] : [-0.12, 0.12]) {
+      L.bullets.push({ kind: 'orb', x: b.x + b.w / 2, y: b.y + 14, vx: Math.cos(a0 + da) * 300, vy: Math.sin(a0 + da) * 300, r: 6, life: 3 });
+    }
+    Sound.play('laser');
+    b.state = 'chase'; b.timer = rage ? 1 : 1.4;
+  } else if (b.state === 'blink') {
+    const tx = clamp(pcx - (dx > 0 ? -1 : 1) * 90 - b.w / 2, TILE, L.w - TILE - b.w);
+    emit(b.x + b.w / 2, b.y + b.h / 2, 16, { color: ['#8a3aff', '#e0d0ff'], speed: 160, grav: 0, life: 0.4 });
+    b.x = tx;
+    emit(b.x + b.w / 2, b.y + b.h / 2, 16, { color: ['#8a3aff', '#e0d0ff'], speed: 160, grav: 0, life: 0.4 });
+    Sound.play('blink');
+    b.state = 'windup'; b.timer = 0.5;
+  } else if (b.state === 'stunned') {
+    b.vx = 0;
+    b.timer -= dt;
+    if (b.timer <= 0) { b.state = 'chase'; b.timer = rage ? 0.9 : 1.3; }
+  }
+  if (b.trail) {
+    for (const tr of b.trail) tr.life -= dt;
+    b.trail = b.trail.filter(tr => tr.life > 0);
+  }
+}
+
 // Тело змея: звенья тянутся за головой, при оглушении падают на землю
 function updateSegments(L, b, dt) {
   const floor = b.groundY + b.h;
@@ -364,6 +495,7 @@ function hitBoss(L, b) {
   emit(b.x + b.w / 2, b.y + 10, 20, { color: ['#ffffff', '#ffd54a', '#ff5d73'], speed: 300, life: 0.6 });
   if (b.kind === 2) b.timer = Math.min(b.timer, 0.5);
   if (b.kind === 4) b.timer = Math.min(b.timer, 0.6);
+  if (b.kind === 7 && b.state !== 'stunned') { b.state = 'blink'; }
   if (b.hp <= 0) {
     b.dead = true;
     b.deathT = 2;
@@ -371,6 +503,7 @@ function hitBoss(L, b) {
     for (const e of L.enemies) if (e.alive) { e.alive = false; e.deadT = 0.6; }
     if (L.goal) L.goal.hidden = false;
     Save.data.stats.bosses++;
+    setTimeout(checkAchievements, 1500);
     floatText(b.x + b.w / 2, b.y - 10, '+50', '#ffd54a', 'coin');
     Game.shake = 20;
     Sound.play('bossDie');
@@ -417,7 +550,8 @@ function bossContact(L, b, p, dt) {
     p.wallLock = 0.25;
     return false;
   }
-  if (vulnerable && b.kind !== 1) return false;   // оглушённый босс не опасен
+  if (vulnerable && b.kind !== 1 && b.kind !== 7) return false;   // оглушённый босс не опасен
+  if (b.kind === 7 && (b.state === 'stunned')) return false;
   if (b.inv > 0.5) return false;                  // сразу после удара
   if (p.spawnT > 0) return false;
   killPlayer();
@@ -430,6 +564,9 @@ function resetBossAfterDeath(L, b) {
   if (b.kind === 1) {
     if (Math.abs(b.x - L.start.x) < TILE * 9) b.x = L.w - TILE * 10;
     b.state = 'walk'; b.timer = 2; b.vx = 0;
+  } else if (b.kind === 6 || b.kind === 7) {
+    if (Math.abs(b.x - L.start.x) < TILE * 9) b.x = L.w - TILE * 10;
+    b.state = b.kind === 6 ? 'walk' : 'chase'; b.timer = 2; b.vx = 0; b.leaping = false;
   } else if (b.kind === 2 || b.kind === 4) {
     b.state = 'rise';
   } else {
@@ -545,6 +682,10 @@ function drawBoss(L, b, t) {
     }
   } else if (b.kind === 4) {
     drawSerpent(b, t, cx, cy);
+  } else if (b.kind === 6) {
+    drawJungleKing(b, t, cx);
+  } else if (b.kind === 7) {
+    drawShadowRob(b, t);
   } else {
     drawOmega(b, t, cx, cy);
   }
@@ -639,5 +780,77 @@ function drawOmega(b, t, cx, cy) {
     ctx.strokeStyle = 'rgba(20,20,30,0.8)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(cx - 20, cy - 26); ctx.lineTo(cx - 12, cy - 16); ctx.lineTo(cx - 16, cy - 10);
     ctx.moveTo(cx + 18, cy + 14); ctx.lineTo(cx + 10, cy + 22); ctx.lineTo(cx + 14, cy + 30); ctx.stroke();
+  }
+}
+
+function drawJungleKing(b, t, cx) {
+  const tired = b.state === 'tired', pound = b.state === 'pound';
+  ctx.save();
+  ctx.translate(cx, b.y + b.h);
+  ctx.scale(b.face, tired ? 0.88 : 1);
+  const step = b.grounded && b.vx ? Math.sin(b.t * 8) * 4 : 0;
+  // ноги
+  ctx.fillStyle = '#3a2f2a';
+  ctx.fillRect(-22 + step, -16, 16, 16); ctx.fillRect(6 - step, -16, 16, 16);
+  // туловище
+  ctx.fillStyle = b.hp <= 4 ? '#7a3a2a' : '#5a4a42';
+  roundRect(ctx, -32, -60, 64, 48, 18); ctx.fill();
+  ctx.fillStyle = '#c9a27a';
+  roundRect(ctx, -16, -48, 32, 30, 10); ctx.fill();
+  ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-10, -38); ctx.lineTo(10, -38); ctx.moveTo(-10, -30); ctx.lineTo(10, -30); ctx.stroke();
+  // руки (в ударах по груди поднимаются)
+  const up = pound ? Math.abs(Math.sin(b.t * 12)) * 16 : tired ? -6 : Math.sin(b.t * 3) * 3;
+  ctx.fillStyle = '#4a3c36';
+  roundRect(ctx, -44, -56 - up, 14, 40, 7); ctx.fill();
+  roundRect(ctx, 30, -56 - up, 14, 40, 7); ctx.fill();
+  ctx.fillStyle = '#c9a27a';
+  ctx.beginPath(); ctx.arc(-37, -16 - up, 8, 0, Math.PI * 2); ctx.arc(37, -16 - up, 8, 0, Math.PI * 2); ctx.fill();
+  // голова
+  ctx.fillStyle = '#5a4a42';
+  roundRect(ctx, -18, -80, 36, 26, 12); ctx.fill();
+  ctx.fillStyle = '#c9a27a';
+  roundRect(ctx, -12, -70, 24, 14, 7); ctx.fill();
+  if (tired) {
+    ctx.strokeStyle = '#1b1b2a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(-10, -76); ctx.lineTo(-4, -72); ctx.moveTo(-4, -76); ctx.lineTo(-10, -72);
+    ctx.moveTo(4, -76); ctx.lineTo(10, -72); ctx.moveTo(10, -76); ctx.lineTo(4, -72); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#ff3b3b'; ctx.fillRect(-10, -76, 6, 5); ctx.fillRect(4, -76, 6, 5);
+    ctx.fillStyle = '#1b1b2a'; ctx.fillRect(-12, -79, 9, 2); ctx.fillRect(3, -79, 9, 2);
+  }
+  // корона
+  ctx.fillStyle = '#ffd54a';
+  ctx.beginPath(); ctx.moveTo(-12, -80); ctx.lineTo(-12, -90); ctx.lineTo(-6, -85); ctx.lineTo(0, -93); ctx.lineTo(6, -85); ctx.lineTo(12, -90); ctx.lineTo(12, -80); ctx.fill();
+  ctx.restore();
+  if (tired) {
+    ctx.fillStyle = '#ffd54a';
+    for (let k = 0; k < 4; k++) { const a = t * 5 + k * 1.57; ctx.fillRect(cx + Math.cos(a) * 28 - 3, b.y - 30 + Math.sin(a) * 6, 6, 6); }
+  }
+}
+
+function drawShadowRob(b, t) {
+  for (const tr of b.trail || []) {
+    const pose = { w: 22, h: 28, face: b.face, sx: 1.35, sy: 1.35, vx: 0, onGround: true, runPhase: 0, blinkT: 1, canDash: false, dashCD: 1 };
+    drawRobot(pose, tr.x + b.w / 2 - 11, tr.y + b.h - 28, tr.life * 2, true, ctx, SHADOW_SKIN);
+  }
+  const stunned = b.state === 'stunned', windup = b.state === 'windup';
+  const pose = {
+    w: 22, h: 28, face: b.face, sx: windup ? 1.15 : b.state === 'dash' ? 1.3 : 1, sy: windup ? 0.85 : b.state === 'dash' ? 0.8 : 1,
+    vx: b.vx, onGround: b.grounded, runPhase: b.t * 16, blinkT: stunned ? -1 : 1, canDash: windup, dashCD: 0,
+  };
+  ctx.save();
+  ctx.translate(b.x + b.w / 2, b.y + b.h);
+  ctx.scale(1.35, 1.35);
+  ctx.translate(-(b.x + b.w / 2), -(b.y + b.h));
+  drawRobot(pose, b.x + b.w / 2 - 11, b.y + b.h - 28, 1, false, ctx, SHADOW_SKIN);
+  ctx.restore();
+  if (windup) {
+    ctx.strokeStyle = `rgba(255,60,92,${0.5 + 0.5 * Math.sin(t * 30)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h / 2, 26, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (stunned) {
+    ctx.fillStyle = '#ffd54a';
+    for (let k = 0; k < 3; k++) { const a = t * 6 + k * 2.1; ctx.fillRect(b.x + b.w / 2 + Math.cos(a) * 16 - 2, b.y - 8 + Math.sin(a) * 4, 4, 4); }
   }
 }

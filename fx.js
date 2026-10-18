@@ -6,7 +6,7 @@
 // ============================================================
 const FX_COUNT = {
   rain: 170, snow: 120, leaves: 26, petals: 30, fireflies: 34, sand: 40,
-  sandstorm: 150, bubbles: 40, embers: 0, sparks: 34, space: 4, feathers: 30, digital: 70,
+  sandstorm: 150, bubbles: 40, embers: 0, sparks: 34, space: 4, feathers: 30, digital: 70, ash: 90,
 };
 
 const Weather = {
@@ -33,6 +33,7 @@ const Weather = {
       case 'bubbles': if (!anywhere) f.y = viewH + 10; f.vy = -rand(30, 70); break;
       case 'sparks': f.vx = rand(-40, 40); f.vy = rand(60, 200); f.y = anywhere ? f.y : -10; break;
       case 'feathers': f.vx = rand(-30, 30); f.vy = rand(15, 35); break;
+      case 'ash': f.vx = rand(-25, 10); f.vy = rand(20, 50); f.hot = Math.random() < 0.15; break;
       case 'digital': f.vx = 0; f.vy = rand(120, 280); f.ch = '01<>{}#$/'[Math.floor(rand(0, 9))]; f.x = Math.round(f.x / 14) * 14; break;
       case 'space': f.x = rand(0, viewW); f.y = rand(-viewH, 0); f.vx = rand(500, 700); f.vy = rand(220, 320); f.wait = rand(0, 4); break;
     }
@@ -135,6 +136,12 @@ const Weather = {
         for (let i = 0; i < 4; i++) {
           const x = ((i * 260 + t * 12) % (viewW + 300)) - 150;
           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 70, 0); ctx.lineTo(x + 170, viewH); ctx.lineTo(x + 60, viewH); ctx.fill();
+        }
+        break;
+      case 'ash':
+        for (const f of this.list) {
+          ctx.fillStyle = f.hot ? `rgba(255,${120 + Math.sin(f.t * 8) * 60},60,0.9)` : 'rgba(170,160,180,0.55)';
+          ctx.fillRect(f.x, f.y, f.hot ? 2.5 : 2 + f.s, f.hot ? 2.5 : 2 + f.s);
         }
         break;
       case 'feathers':

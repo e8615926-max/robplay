@@ -333,3 +333,67 @@ body.style-cartoon .pips i { background: rgba(42,42,74,.2); }
 .panel > * { flex-shrink: 0; }
 body.style-retro .level-card .name, body.style-retro .level-card .best, body.style-retro .tab { line-height: 1.6; }
 body.style-retro .tab small { font-size: 8px; }
+
+/* ===================== Игроки и достижения ===================== */
+.player-chip {
+  align-self: center; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: rgba(0,0,0,.28); border: 2px solid rgba(255,255,255,.15); color: inherit; font: inherit; font-weight: 800;
+  padding: 3px 12px 3px 4px; border-radius: 999px; margin-bottom: -4px;
+}
+.player-chip:hover { border-color: #6fd3ff; }
+.player-chip canvas { width: 36px; height: 36px; border-radius: 50%; background: rgba(111,211,255,.15); }
+.player-chip small { opacity: .6; font-weight: 600; }
+.name-input {
+  font: inherit; font-size: 20px; font-weight: 700; text-align: center; padding: 12px; border-radius: 12px;
+  border: 2px solid #3b4a8a; background: #0e1430; color: #fff; outline: none;
+}
+.name-input:focus { border-color: #6fd3ff; }
+.profile-list { display: flex; flex-direction: column; gap: 8px; }
+.profile-card {
+  display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px;
+  background: #22306a; border: 2px solid transparent; border-radius: 14px;
+}
+.profile-card.selected { border-color: #56e39f; }
+.profile-card canvas { width: 52px; height: 52px; border-radius: 12px; background: rgba(0,0,0,.25); flex-shrink: 0; }
+.pc-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-body b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-body span { display: flex; align-items: center; gap: 4px; font-size: 13px; opacity: .85; }
+.pc-body span .ic, .leaderboard .ic { width: 15px; height: 15px; }
+.pc-body small { font-size: 12px; opacity: .6; }
+.pc-actions { display: flex; gap: 6px; }
+.pc-actions .btn { flex: 0 0 auto; padding: 8px 10px; }
+.btn.icon-only { padding: 8px; }
+.leaderboard { width: 100%; border-collapse: collapse; font-size: 14px; }
+.leaderboard th, .leaderboard td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: center; }
+.leaderboard td:nth-child(2), .leaderboard th:nth-child(2) { text-align: left; }
+.leaderboard tr.me td { color: #ffd54a; font-weight: 800; }
+.leaderboard .ic { width: 18px; height: 18px; }
+.save-code {
+  width: 100%; font-family: monospace; font-size: 12px; padding: 8px; border-radius: 10px; resize: vertical;
+  background: #0e1430; color: #cfe; border: 2px solid #3b4a8a;
+}
+.ach-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; text-align: left; }
+.ach { display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: rgba(0,0,0,.22); opacity: .5; }
+.ach.on { opacity: 1; background: rgba(255,213,74,.12); box-shadow: inset 0 0 0 1px rgba(255,213,74,.4); }
+.ach .ic { width: 28px; height: 28px; flex-shrink: 0; }
+.ach b { display: block; font-size: 14px; }
+.ach span { font-size: 12px; opacity: .8; }
+#ach-count { opacity: .7; font-weight: 600; }
+#ach-pop {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; gap: 12px; align-items: center;
+  background: linear-gradient(135deg, #2a1f5a, #4a2a7a); border: 2px solid #ffd54a; border-radius: 16px;
+  padding: 12px 16px; max-width: min(92vw, 380px); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  animation: achIn .5s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes achIn { from { transform: translateX(120%); } }
+#ach-pop .ach-icon .ic { width: 40px; height: 40px; }
+#ach-pop small { display: block; color: #ffd54a; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+#ach-pop b { display: block; font-size: 17px; }
+#ach-pop span { display: flex; align-items: center; gap: 4px; font-size: 13px; opacity: .85; }
+#ach-pop span .ic { width: 14px; height: 14px; }
+body.style-cartoon .profile-card, body.style-cartoon .ach { background: #fff; color: #2a2a4a; border: 3px solid #2a2a4a; }
+body.style-cartoon .ach.on { background: #fff3b0; }
+body.style-cartoon .name-input, body.style-cartoon .save-code { background: #fff; color: #2a2a4a; border: 3px solid #2a2a4a; }
+body.style-cartoon .player-chip { background: #2a2a4a; color: #fff; }
+body.style-retro .profile-card, body.style-retro .ach, body.style-retro .name-input, body.style-retro .player-chip { border-radius: 0; font-family: 'Press Start 2P', monospace; font-size: 10px; }
+body.style-blocks .profile-card, body.style-blocks .ach { border-radius: 2px; background: #4a4a4a; border: 2px solid #1a1a1a; }

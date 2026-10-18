@@ -19,6 +19,8 @@ const PROP_KINDS = {
   11: ['alien', 'crystal', 'alien'],
   12: ['flower', 'bush', 'statue', 'flower'],
   13: ['node', 'crystal', 'antenna'],
+  14: ['fern', 'flower', 'mushroom', 'fern'],
+  15: ['torch', 'crystal', 'rock'],
 };
 
 function buildProps(L) {
@@ -98,7 +100,7 @@ function drawProps(L, cam, t) {
       }
       case 'crystal': {
         const a = 0.6 + 0.4 * Math.sin(t * 3 + pr.seed);
-        const col = L.def.theme === 11 ? '192,140,255' : '122,215,255';
+        const col = L.def.theme === 11 || L.def.theme === 15 ? '192,140,255' : '122,215,255';
         ctx.fillStyle = `rgba(${col},${a})`;
         ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-2, -12); ctx.lineTo(1, 0); ctx.fill();
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(3, -8); ctx.lineTo(6, 0); ctx.fill();
@@ -179,6 +181,14 @@ function drawProps(L, cam, t) {
         ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(0, -12); ctx.lineTo(5, 0); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.fillRect(-2.5, -7, 5, 2);
         break;
+      case 'torch': {
+        ctx.fillStyle = '#5a4a42'; ctx.fillRect(-1.5, -12, 3, 12);
+        const fl = Math.sin(t * 18 + pr.seed) * 1.5;
+        ctx.fillStyle = 'rgba(255,140,40,0.3)'; ctx.beginPath(); ctx.arc(0, -15, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.moveTo(-3.5, -12); ctx.quadraticCurveTo(fl, -24, 3.5, -12); ctx.fill();
+        ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.moveTo(-1.5, -12); ctx.quadraticCurveTo(0, -17, 1.5, -12); ctx.fill();
+        break;
+      }
       case 'statue':
         ctx.fillStyle = '#f0d9a0'; ctx.fillRect(-4, -6, 8, 6);
         ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(0, -11, 5, 0, Math.PI * 2); ctx.fill();

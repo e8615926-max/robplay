@@ -152,7 +152,7 @@ function updatePBullets(L, dt) {
     if (!hit) {
       for (const e of L.enemies) {
         if (!e.alive || !overlap(box, e)) continue;
-        if (e.type === 'saw' || e.type === 'dropper') { Sound.play('ding'); }
+        if (e.type === 'saw' || e.type === 'dropper' || (e.type === 'turtle' && Math.sign(s.vx) === -e.face)) { Sound.play('ding'); }
         else killEnemy(e, null, false);
         hit = true; break;
       }

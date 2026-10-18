@@ -78,10 +78,12 @@ const Wheel = {
       }
     } else {
       Save.data.wallet += p.coins;
+      if (p.coins >= 250) Save.data.flags.jackpot = true;
       Save.data.stats.coins += p.coins;
       text = `+${p.coins} ${ico('coin')}`;
     }
     Save.store();
+    checkAchievements();
     $('wheel-result').innerHTML = text;
     Sound.play(p.coins >= 100 || p.skin ? 'jackpot' : 'win');
     for (let i = 0; i < 70; i++) {

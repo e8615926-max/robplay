@@ -136,8 +136,9 @@ levels.append(dict(name='Финальный забег',par=90,theme=5,
 import random
 
 # Враги, которые открываются по мере прохождения (номер уровня с 1)
-GROUND_POOL = [(1, 'E'), (7, 'J'), (8, 'S'), (11, 'H'), (11, 'N'), (12, 'Y'), (17, 'A')]
-AIR_POOL = [(1, 'F'), (9, 'W'), (14, 'U'), (18, 'Q')]
+GROUND_POOL = [(1, 'E'), (7, 'J'), (8, 'S'), (11, 'H'), (11, 'N'), (12, 'Y'), (17, 'A'),
+               (51, 'L'), (55, '1'), (57, '2'), (61, '3')]
+AIR_POOL = [(1, 'F'), (9, 'W'), (14, 'U'), (18, 'Q'), (53, 'I')]
 POWERUPS = '!&*'   # щит, магнит, звезда
 
 
@@ -172,6 +173,7 @@ class Gen:
         s.e(x + w - 3)
         if s.diff >= 2: s.e(x + w // 2)
         if s.num > 30: s.e(x + 3)
+        if s.num > 50 and w >= 13: s.e(x + 7)
         if s.diff >= 2 and s.rng.random() < 0.6:
             s.l.row(x + 5, 8, '=', 4); s.l.coins([(x + 6, 7), (x + 7, 7)])
             s.a(x + 8, 5)
@@ -291,6 +293,10 @@ class Gen:
 
     def build(s, n):
         s.flat(7); s.l.put(2, 11, 'P')
+        # новый враг появляется сразу после старта уровня, где о нём подсказка
+        intro = {51: ('L', 11), 53: ('I', 8), 55: ('1', 11), 57: ('2', 11), 61: ('3', 11)}.get(s.num)
+        if intro:
+            x = s.x; s.flat(10); s.l.put(x + 7, intro[1], intro[0]); s.l.coins([(x + 3, 9), (x + 4, 9)])
         m = s.mods
         table = [  # (кусок, мин. сложность, вес)
             (s.c_run, 1, 3), (s.c_gap, 1, 3), (s.c_double_gap, 1, 2), (s.c_stairs, 1, 2),
@@ -336,10 +342,18 @@ def boss_arena(kind):
         l.put(3, 11, 'B'); l.put(34, 11, 'B')
         l.row(6, 8, '=', 4); l.row(28, 8, '=', 4); l.row(16, 6, '=', 6)
         l.coins([(7, 7), (29, 7), (18, 5), (19, 5)])
-    else:
+    elif kind == 5:
         l.row(5, 9, '=', 4); l.row(29, 9, '=', 4); l.row(15, 6, '=', 8)
         l.put(11, 11, '!')
         l.coins([(6, 8), (30, 8), (17, 5), (20, 5)])
+    elif kind == 6:
+        l.row(7, 8, '=', 5); l.row(26, 8, '=', 5)
+        l.put(10, 11, '!')
+        l.coins([(8, 7), (27, 7), (19, 9)])
+    else:
+        l.row(4, 9, '=', 4); l.row(30, 9, '=', 4); l.row(11, 6, '=', 4); l.row(23, 6, '=', 4); l.row(17, 3, '=', 4)
+        l.put(18, 11, '!'); l.put(8, 11, '&')
+        l.coins([(5, 8), (31, 8), (12, 5), (24, 5), (18, 2)])
     return l.out()
 
 
@@ -388,7 +402,27 @@ NEW = [
     (47, 'Вирусная зона', 'Самые опасные программы собрались здесь.', 13, 3, 17, {}),
     (48, 'Ядро сервера', 'Тьма и шум вентиляторов.', 13, 3, 17, {'dark': True}),
     (49, 'Последний байт', 'Остался один шаг до Омеги.', 13, 3, 18, {}),
-    (50, 'ФИНАЛ: Омега', 'Омега стреляет лазерами — следи за красной линией и уходи с неё! Бей, когда Омега устанет.', 13, 0, 0, {'boss': 5}),
+    (50, 'БОСС: Омега', 'Омега стреляет лазерами — следи за красной линией и уходи с неё! Бей, когда Омега устанет.', 13, 0, 0, {'boss': 5}),
+    (51, 'Дикие джунгли', 'Мир 6: Джунгли. Новый враг: глаз-лазер — следи за красной линией и не стой на ней!', 14, 3, 15, {}),
+    (52, 'Лианы', 'Джунгли полны опасностей.', 14, 3, 15, {}),
+    (53, 'Древний храм', 'Плавающие мины пищат, когда ты рядом, — убегай или обезвредь способностью!', 14, 3, 16, {'dark': True}),
+    (54, 'Болото', 'Не упади в трясину.', 14, 3, 16, {}),
+    (55, 'Водопады', 'Черепаха прикрыта щитом спереди: прыгай сверху или бей со спины.', 14, 3, 16, {}),
+    (56, 'Тропа хищников', 'Хищники выходят на охоту.', 14, 3, 17, {'lowGrav': True}),
+    (57, 'Затерянный город', 'Ниндзя-боты прыгают и бросают сюрикены!', 14, 3, 17, {'dark': True}),
+    (58, 'Вершина джунглей', 'Высоко над деревьями.', 14, 3, 17, {}),
+    (59, 'Логово короля', 'Король Джунглей уже близко.', 14, 3, 18, {}),
+    (60, 'БОСС: Король Джунглей', 'Король швыряет бочки и прыгает через арену. Когда он устанет и сядет — прыгай на голову!', 14, 0, 0, {'boss': 6}),
+    (61, 'Тёмная цитадель', 'Мир 7: Тёмная цитадель. Тени-клоны быстры — будь начеку!', 15, 3, 16, {}),
+    (62, 'Залы теней', 'Тьма сгущается.', 15, 3, 16, {'dark': True}),
+    (63, 'Огненный мост', 'Мост над бездной.', 15, 3, 17, {}),
+    (64, 'Зеркальный лабиринт', 'Скользкий зеркальный пол.', 15, 3, 17, {'ice': True}),
+    (65, 'Башня ветров', 'Почти невесомость.', 15, 3, 17, {'lowGrav': True}),
+    (66, 'Темница', 'Глубоко под цитаделью.', 15, 3, 18, {'dark': True}),
+    (67, 'Тронный зал', 'Стража цитадели не дремлет.', 15, 3, 18, {}),
+    (68, 'Грань хаоса', 'Всё, что ты встречал, — здесь.', 15, 3, 18, {}),
+    (69, 'Последняя лестница', 'Последний шаг до твоей тени.', 15, 3, 19, {}),
+    (70, 'ФИНАЛ: Тёмный Роб', 'Твоя тень повторяет твои способности: рывок, бластер, телепорт. После рывка она теряется — бей!', 15, 0, 0, {'boss': 7}),
 ]
 
 EN = {
@@ -441,7 +475,27 @@ EN = {
     47: ('Virus Zone', 'The most dangerous programs gathered here.'),
     48: ('Server Core', 'Darkness and the hum of fans.'),
     49: ('Last Byte', 'One step left to Omega.'),
-    50: ('FINAL: Omega', 'Omega fires lasers — watch the red line and get off it! Strike when Omega is tired.'),
+    50: ('BOSS: Omega', 'Omega fires lasers — watch the red line and get off it! Strike when Omega is tired.'),
+    51: ('Wild Jungle', 'World 6: Jungle. New enemy: the laser eye — watch the red line and do not stand on it!'),
+    52: ('Vines', 'The jungle is full of dangers.'),
+    53: ('Ancient Temple', 'Floating mines beep when you are close — run or defuse them with your ability!'),
+    54: ('Swamp', 'Do not fall into the bog.'),
+    55: ('Waterfalls', 'The turtle is shielded in front: jump on it or hit it from behind.'),
+    56: ('Predator Trail', 'The predators are out hunting.'),
+    57: ('Lost City', 'Ninja bots jump and throw shurikens!'),
+    58: ('Jungle Peak', 'High above the trees.'),
+    59: ("King's Lair", 'The Jungle King is near.'),
+    60: ('BOSS: Jungle King', 'The King throws barrels and leaps across the arena. When he gets tired and sits down — jump on his head!'),
+    61: ('Dark Citadel', 'World 7: Dark Citadel. Shadow clones are fast — stay alert!'),
+    62: ('Halls of Shadow', 'The darkness thickens.'),
+    63: ('Fire Bridge', 'A bridge over the abyss.'),
+    64: ('Mirror Maze', 'A slippery mirror floor.'),
+    65: ('Tower of Winds', 'Almost weightless.'),
+    66: ('Dungeon', 'Deep beneath the citadel.'),
+    67: ('Throne Hall', 'The citadel guards never sleep.'),
+    68: ('Edge of Chaos', 'Everything you have met is here.'),
+    69: ('Final Staircase', 'One step from your shadow.'),
+    70: ('FINAL: Shadow Rob', 'Your shadow copies your abilities: dash, blaster, blink. After a dash it is dazed — strike!'),
 }
 # Нумерация лиги: уровни 1–6 сделаны вручную выше
 for num, name, tip, theme, diff, chunks, mods in NEW:
@@ -464,6 +518,7 @@ with open('levels.js', 'w') as f:
     f.write('//  Враги: E ходок  F летун  J прыгун  S ёж  H таран  T турель\n')
     f.write('//         W летучая мышь  Q призрак  O пила  D давилка  Z босс\n')
     f.write('//         N улитка  Y слизень  U паук  A гренадёр  R ракетница\n')
+    f.write('//         L глаз-лазер  I мина  1 черепаха  2 ниндзя  3 тень\n')
     f.write('//  Бонусы: ! щит  & магнит  * звезда\n')
     f.write('const LEVELS = [\n')
     for lv in levels:

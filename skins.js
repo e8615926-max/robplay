@@ -22,6 +22,9 @@ const SKINS = [
   { id: 'champion', name: 'Чемпион', name_en: 'Champion', price: 0, req: 'final', body: '#2e3a8c', dark: '#ffd54a', eye: '#ffd54a', acc: 'crown', glow: '#8fe9ff', trail: 'rainbow' },
 ];
 
+// Облик тёмных клонов и босса Тёмного Роба
+const SHADOW_SKIN = { id: 'shadow', body: '#2a1a40', dark: '#120a1e', eye: '#ff3b5c', glow: '#8a3aff' };
+
 function skinById(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
 function currentSkin() { return skinById(Save.data.skin); }
 
