@@ -77,12 +77,15 @@ const MenuScene = {
     }
   },
 
-  draw() {
+  // opts: robot, items (по умолчанию да), sky: 'sunset' | 'red' | 'night', dark — погасить окна
+  draw(opts = {}) {
     if (!this.robot) this.reset();
-    const t = this.t, W = viewW, H = viewH, gy = this.groundY();
+    const showRobot = opts.robot !== false, showItems = opts.items !== false;
+    const t = this.t || performance.now() / 1000, W = viewW, H = viewH, gy = this.groundY();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    sky.addColorStop(0, '#120b33'); sky.addColorStop(0.45, '#4a2a7a'); sky.addColorStop(0.75, '#d9587a'); sky.addColorStop(1, '#ffb36b');
+    const pal = { sunset: ['#120b33', '#4a2a7a', '#d9587a', '#ffb36b'], red: ['#1a0308', '#5a0a1a', '#b8202a', '#ff6a3d'], night: ['#03020a', '#0d0a2a', '#1d1645', '#2e2260'] }[opts.sky || 'sunset'];
+    sky.addColorStop(0, pal[0]); sky.addColorStop(0.45, pal[1]); sky.addColorStop(0.75, pal[2]); sky.addColorStop(1, pal[3]);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
@@ -95,9 +98,11 @@ const MenuScene = {
     ctx.globalAlpha = 1;
 
     // солнце в стиле ретро с полосами
-    const sx = W * 0.72, sy = H * 0.62, sr = Math.min(150, W * 0.16);
+    const sx = W * 0.72, sy = H * (opts.sky === 'night' ? 0.2 : 0.62), sr = Math.min(150, W * 0.16) * (opts.sky === 'night' ? 0.4 : 1);
     const sg = ctx.createLinearGradient(0, sy - sr, 0, sy + sr);
-    sg.addColorStop(0, '#ffe36b'); sg.addColorStop(1, '#ff5d8f');
+    if (opts.sky === 'night') { sg.addColorStop(0, '#f4f1d0'); sg.addColorStop(1, '#c9c3a0'); }
+    else if (opts.sky === 'red') { sg.addColorStop(0, '#ff8a3d'); sg.addColorStop(1, '#7a0a1a'); }
+    else { sg.addColorStop(0, '#ffe36b'); sg.addColorStop(1, '#ff5d8f'); }
     ctx.save();
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = sg; ctx.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
@@ -140,7 +145,7 @@ const MenuScene = {
         // окна
         for (let wy = by + 12; wy < gy - 16; wy += 18) {
           for (let wx = bx + 8; wx < bx + bw - 12; wx += 14) {
-            const on = hash(i * 31 + wx * 0.7 + wy * 1.3 + Math.floor(t * 0.5 + hash(wx + wy) * 3)) > 0.45;
+            const on = !opts.dark && hash(i * 31 + wx * 0.7 + wy * 1.3 + Math.floor(t * 0.5 + hash(wx + wy) * 3)) > 0.45;
             ctx.fillStyle = on ? 'rgba(255,214,120,0.85)' : 'rgba(80,50,110,0.8)';
             ctx.fillRect(wx, wy, 7, 9);
           }
@@ -180,7 +185,7 @@ const MenuScene = {
     for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(0, gy + k * 18); ctx.lineTo(W, gy + k * 18); ctx.stroke(); }
 
     // монеты и шипы
-    for (const it of this.items) {
+    for (const it of showItems ? this.items : []) {
       if (it.kind === 'spike') {
         ctx.fillStyle = '#cfd6e6';
         for (let k = 0; k < 3; k++) {
@@ -199,7 +204,6 @@ const MenuScene = {
 
     // робот в выбранном скине
     const r = this.robot, rx = this.robotX();
-    drawRobot(r, rx - 11, gy - 28 + r.y, 1, false, ctx);
-    drawParticles();
+    if (showRobot) { drawRobot(r, rx - 11, gy - 28 + r.y, 1, false, ctx); drawParticles(); }
   },
 };

@@ -57,7 +57,7 @@ const Save = {
   data: {
     unlocked: 1, best: {}, muted: false, music: true,
     wallet: 0, skin: 'classic', skins: ['classic'], champion: false,
-    sfxVol: 1, musicVol: 1, shake: true,
+    sfxVol: 1, musicVol: 1, shake: true, seen: {}, wheel: null,
     stats: { coins: 0, deaths: 0, kills: 0, bosses: 0, time: 0, completed: 0 },
   },
   load() {
@@ -76,9 +76,57 @@ const Save = {
 };
 
 // ---------- Звук (синтез через WebAudio) ----------
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+
+// Музыкальные темы: аккорды, темп, мелодия, инструменты, ударные
+const TRACKS = {
+  menu: {
+    eighth: 0.2, arpType: 'triangle', leadType: 'square', bassType: 'sawtooth', drums: true,
+    chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
+    lead: [76, 0, 74, 72, 0, 72, 74, 0, 72, 0, 69, 0, 72, 74, 76, 0, 79, 0, 76, 74, 0, 72, 74, 0, 74, 0, 71, 0, 74, 0, 67, 0],
+  },
+  w1: {
+    eighth: 0.22, arpType: 'triangle', leadType: 'square', bassType: 'sine', drums: true,
+    chords: [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
+    lead: [72, 0, 76, 79, 0, 76, 72, 0, 74, 0, 79, 0, 74, 71, 67, 0, 72, 76, 0, 72, 69, 0, 72, 0, 77, 0, 76, 74, 72, 0, 0, 0],
+  },
+  w2: {
+    eighth: 0.2, arpType: 'square', leadType: 'triangle', bassType: 'sawtooth', drums: true,
+    chords: [[62, 65, 69], [58, 62, 65], [53, 57, 60], [60, 64, 67]],
+    lead: [74, 0, 77, 0, 81, 79, 77, 0, 74, 0, 70, 0, 74, 77, 0, 0, 72, 0, 77, 76, 74, 0, 72, 0, 76, 0, 79, 0, 76, 72, 0, 0],
+  },
+  w3: {
+    eighth: 0.18, arpType: 'sawtooth', leadType: 'square', bassType: 'sawtooth', drums: true,
+    chords: [[64, 67, 71], [60, 64, 67], [57, 60, 64], [59, 63, 66]],
+    lead: [76, 0, 79, 76, 83, 0, 79, 0, 72, 0, 76, 79, 76, 0, 72, 0, 69, 0, 72, 76, 81, 0, 76, 0, 71, 0, 75, 78, 83, 0, 78, 0],
+  },
+  boss: {
+    eighth: 0.16, arpType: 'sawtooth', leadType: 'square', bassType: 'square', drums: true, heavy: true,
+    chords: [[57, 60, 64], [58, 62, 65], [55, 58, 62], [56, 59, 64]],
+    lead: [81, 0, 81, 79, 81, 0, 84, 0, 82, 0, 81, 79, 77, 0, 79, 0, 79, 0, 77, 76, 74, 0, 76, 0, 80, 0, 83, 0, 88, 0, 0, 0],
+  },
+  story: {
+    eighth: 0.3, arpType: 'sine', leadType: 'triangle', bassType: 'sine', drums: false,
+    chords: [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 56, 59]],
+    lead: [76, 0, 0, 72, 0, 0, 74, 0, 72, 0, 0, 69, 0, 0, 0, 0, 74, 0, 0, 77, 0, 0, 76, 0, 71, 0, 0, 68, 0, 0, 0, 0],
+  },
+};
+
+// Фоновые звуки окружения по эффекту карты
+const AMBIENT = {
+  rain: { type: 'bandpass', freq: 1400, q: 0.6, vol: 0.12 },
+  snow: { type: 'lowpass', freq: 500, q: 1, vol: 0.08, wobble: true },
+  sandstorm: { type: 'bandpass', freq: 700, q: 0.8, vol: 0.14, wobble: true },
+  bubbles: { type: 'lowpass', freq: 260, q: 2, vol: 0.12, wobble: true },
+  embers: { type: 'lowpass', freq: 140, q: 3, vol: 0.18 },
+  sparks: { type: 'lowpass', freq: 200, q: 6, vol: 0.06 },
+  fireflies: { type: 'highpass', freq: 5000, q: 1, vol: 0.015 },
+};
+
 const Sound = {
-  ctx: null, master: null, sfxBus: null, musicBus: null,
-  step: 0, nextTime: 0, timer: null, boss: false,
+  ctx: null, master: null, sfxBus: null, musicBus: null, ambBus: null,
+  step: 0, nextTime: 0, timer: null, track: 'menu', amb: null, ambKind: null,
+  lastStep: 0, noiseBuf: null,
 
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
@@ -86,19 +134,62 @@ const Sound = {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.connect(this.ctx.destination);
-    this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 0.5; this.sfxBus.connect(this.master);
+    // мягкий компрессор, чтобы звуки не перегружали друг друга
+    const comp = this.ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 4;
+    this.master.connect(comp); comp.connect(this.ctx.destination);
+    this.sfxBus = this.ctx.createGain(); this.sfxBus.connect(this.master);
     this.musicBus = this.ctx.createGain(); this.musicBus.connect(this.master);
+    this.ambBus = this.ctx.createGain(); this.ambBus.connect(this.master);
+    const len = this.ctx.sampleRate * 2;
+    this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.apply();
     this.nextTime = this.ctx.currentTime + 0.1;
     this.timer = setInterval(() => this.schedule(), 25);
+    if (this.ambKind) { const k = this.ambKind; this.ambKind = null; this.setAmbient(k); }
   },
 
   apply() {
     if (!this.ctx) return;
     this.master.gain.value = Save.data.muted ? 0 : 1;
     this.sfxBus.gain.value = 0.5 * Save.data.sfxVol;
+    this.ambBus.gain.value = Save.data.sfxVol;
     this.musicBus.gain.value = Save.data.music ? 0.11 * Save.data.musicVol : 0;
+  },
+
+  setTrack(name) {
+    if (this.track === name) return;
+    this.track = name;
+    this.step = 0;
+  },
+
+  setAmbient(kind) {
+    if (!this.ctx) { this.ambKind = kind; return; }
+    if (this.ambKind === kind) return;
+    this.ambKind = kind;
+    if (this.amb) {
+      const old = this.amb;
+      old.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
+      setTimeout(() => { try { old.src.stop(); } catch (e) { /* ignore */ } }, 1500);
+      this.amb = null;
+    }
+    const a = AMBIENT[kind];
+    if (!a) return;
+    const c = this.ctx;
+    const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = a.type; f.frequency.value = a.freq; f.Q.value = a.q;
+    const g = c.createGain(); g.gain.value = 0;
+    g.gain.setTargetAtTime(a.vol, c.currentTime, 0.5);
+    src.connect(f); f.connect(g); g.connect(this.ambBus);
+    if (a.wobble) {
+      const lfo = c.createOscillator(), lg = c.createGain();
+      lfo.frequency.value = 0.15; lg.gain.value = a.freq * 0.4;
+      lfo.connect(lg); lg.connect(f.frequency); lfo.start();
+    }
+    src.start();
+    this.amb = { src, g };
   },
 
   tone(freq, dur, type = 'square', vol = 0.3, slideTo = 0, delay = 0, bus = this.sfxBus, at = 0) {
@@ -115,66 +206,88 @@ const Sound = {
     o.start(t); o.stop(t + dur + 0.05);
   },
 
-  noise(dur, vol = 0.3, freq = 1200, delay = 0) {
-    const c = this.ctx, t = c.currentTime + delay;
-    const len = Math.floor(c.sampleRate * dur);
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = c.createBufferSource(); src.buffer = buf;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq;
-    const g = c.createGain(); g.gain.value = vol;
-    src.connect(f); f.connect(g); g.connect(this.sfxBus);
-    src.start(t);
+  noise(dur, vol = 0.3, freq = 1200, delay = 0, bus = this.sfxBus, at = 0, type = 'lowpass') {
+    const c = this.ctx, t = (at || c.currentTime) + delay;
+    const src = c.createBufferSource(); src.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(bus);
+    src.start(t, Math.random() * 1.5, dur + 0.05);
   },
 
-  play(name) {
+  play(name, k = 1) {
     if (!this.ctx || Save.data.muted) return;
     switch (name) {
-      case 'jump': this.tone(320, 0.14, 'square', 0.18, 640); break;
-      case 'djump': this.tone(480, 0.16, 'square', 0.16, 980); break;
-      case 'walljump': this.tone(380, 0.12, 'square', 0.16, 760); this.noise(0.06, 0.15, 3000); break;
-      case 'coin': this.tone(988, 0.08, 'square', 0.14); this.tone(1319, 0.22, 'square', 0.14, 0, 0.07); break;
-      case 'stomp': this.tone(220, 0.15, 'square', 0.25, 90); this.noise(0.1, 0.3, 900); break;
-      case 'dash': this.noise(0.18, 0.35, 2600); this.tone(200, 0.18, 'sawtooth', 0.08, 600); break;
-      case 'bounce': this.tone(180, 0.3, 'sine', 0.35, 720); break;
-      case 'crumble': this.noise(0.25, 0.25, 600); break;
-      case 'checkpoint': [523, 659, 784].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.25, 0, i * 0.08)); break;
-      case 'death': this.tone(440, 0.5, 'sawtooth', 0.22, 60); this.noise(0.35, 0.35, 1500); break;
-      case 'win': [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, 0.25, 'square', 0.16, 0, i * 0.1)); break;
-      case 'click': this.tone(660, 0.05, 'square', 0.1); break;
-      case 'shoot': this.tone(520, 0.12, 'square', 0.12, 180); break;
-      case 'swoop': this.tone(900, 0.25, 'sine', 0.12, 300); break;
-      case 'thud': this.tone(110, 0.25, 'sine', 0.4, 40); this.noise(0.2, 0.3, 400); break;
-      case 'boom': this.noise(0.3, 0.35, 700); this.tone(90, 0.3, 'sine', 0.3, 40); break;
-      case 'thunder': this.noise(1.2, 0.45, 300); break;
-      case 'summon': this.tone(300, 0.4, 'sawtooth', 0.12, 900); break;
-      case 'bossJump': this.tone(140, 0.3, 'square', 0.2, 280); break;
-      case 'bossHit': this.tone(180, 0.2, 'square', 0.3, 60); this.noise(0.15, 0.35, 2000); break;
-      case 'bossDie': [784, 659, 523, 392, 523, 784, 1047].forEach((f, i) => this.tone(f, 0.3, 'square', 0.16, 0, i * 0.12)); this.noise(1, 0.3, 800); break;
+      case 'jump': this.tone(320, 0.14, 'square', 0.16, 640); break;
+      case 'djump': this.tone(480, 0.16, 'square', 0.14, 980); this.tone(720, 0.1, 'sine', 0.1, 1400, 0.03); break;
+      case 'walljump': this.tone(380, 0.12, 'square', 0.15, 760); this.noise(0.06, 0.15, 3000); break;
+      case 'coin': {
+        const p = Math.min(2, 1 + (k - 1) * 0.06);   // каждая следующая монета выше
+        this.tone(988 * p, 0.08, 'square', 0.12); this.tone(1319 * p, 0.22, 'square', 0.12, 0, 0.07);
+        break;
+      }
+      case 'stomp': this.tone(220, 0.15, 'square', 0.22, 90); this.noise(0.1, 0.25, 900); break;
+      case 'dash': this.noise(0.2, 0.3, 2600, 0, this.sfxBus, 0, 'bandpass'); this.tone(200, 0.18, 'sawtooth', 0.08, 600); break;
+      case 'bounce': this.tone(180, 0.3, 'sine', 0.32, 720); this.tone(360, 0.2, 'triangle', 0.1, 1440, 0.05); break;
+      case 'crumble': this.noise(0.3, 0.25, 600); this.tone(120, 0.2, 'triangle', 0.1, 60); break;
+      case 'checkpoint': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.2, 'triangle', 0.22, 0, i * 0.07)); break;
+      case 'death': this.tone(440, 0.5, 'sawtooth', 0.2, 60); this.noise(0.35, 0.3, 1500); break;
+      case 'win': [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, 0.25, 'square', 0.14, 0, i * 0.1)); break;
+      case 'jackpot': [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.3, 'square', 0.13, 0, i * 0.07)); this.noise(0.6, 0.15, 6000, 0.4, this.sfxBus, 0, 'highpass'); break;
+      case 'click': this.tone(660, 0.05, 'square', 0.08); break;
+      case 'hover': this.tone(1200, 0.03, 'sine', 0.04); break;
+      case 'blip': this.tone(520 + Math.random() * 120, 0.04, 'square', 0.04); break;
+      case 'step': this.noise(0.04, 0.06, 2500, 0, this.sfxBus, 0, 'highpass'); break;
+      case 'land': this.noise(0.08, 0.12, 700); this.tone(120, 0.08, 'sine', 0.12, 70); break;
+      case 'shoot': this.tone(520, 0.12, 'square', 0.1, 180); break;
+      case 'swoop': this.tone(900, 0.25, 'sine', 0.1, 300); break;
+      case 'thud': this.tone(110, 0.25, 'sine', 0.38, 40); this.noise(0.2, 0.28, 400); break;
+      case 'boom': this.noise(0.4, 0.35, 700); this.tone(90, 0.35, 'sine', 0.3, 35); break;
+      case 'thunder': this.noise(1.6, 0.4, 260); this.tone(50, 1.2, 'sine', 0.2, 30); break;
+      case 'summon': this.tone(300, 0.4, 'sawtooth', 0.1, 900); this.tone(450, 0.4, 'sine', 0.08, 1350, 0.1); break;
+      case 'bossJump': this.tone(140, 0.3, 'square', 0.18, 280); break;
+      case 'bossHit': this.tone(180, 0.2, 'square', 0.28, 60); this.noise(0.15, 0.3, 2000); break;
+      case 'bossDie': [784, 659, 523, 392, 523, 784, 1047].forEach((f, i) => this.tone(f, 0.3, 'square', 0.14, 0, i * 0.12)); this.noise(1, 0.3, 800); break;
+      case 'croak': this.tone(180, 0.12, 'square', 0.08, 120); this.tone(150, 0.1, 'square', 0.06, 100, 0.12); break;
+      case 'snort': this.noise(0.25, 0.2, 500, 0, this.sfxBus, 0, 'bandpass'); this.tone(90, 0.2, 'sawtooth', 0.08, 60); break;
+      case 'woo': this.tone(300, 0.7, 'sine', 0.07, 200); this.tone(306, 0.7, 'sine', 0.05, 205); break;
+      case 'hiss': this.noise(0.3, 0.08, 5000, 0, this.sfxBus, 0, 'highpass'); break;
+      case 'kick': this.tone(260, 0.1, 'square', 0.18, 520); this.noise(0.05, 0.2, 2000); break;
+      case 'squish': this.tone(400, 0.2, 'sine', 0.18, 120); this.noise(0.1, 0.15, 800); break;
+      case 'throw': this.noise(0.12, 0.12, 1500, 0, this.sfxBus, 0, 'bandpass'); break;
+      case 'launch': this.noise(0.4, 0.2, 1200); this.tone(200, 0.4, 'sawtooth', 0.06, 500); break;
+      case 'powerup': [523, 784, 659, 1047, 784, 1319].forEach((f, i) => this.tone(f, 0.12, 'square', 0.12, 0, i * 0.05)); break;
+      case 'powerdown': this.tone(784, 0.3, 'triangle', 0.12, 260); break;
+      case 'shieldBreak': this.noise(0.3, 0.3, 4000, 0, this.sfxBus, 0, 'highpass'); this.tone(1400, 0.3, 'triangle', 0.15, 300); break;
+      case 'spin': this.tone(300, 0.5, 'sawtooth', 0.06, 900); break;
+      case 'tick': this.tone(1800, 0.025, 'square', 0.06); break;
+      case 'firework': this.noise(0.5, 0.18, 2500, 0.05); this.tone(1200, 0.4, 'sine', 0.05, 300); break;
+      case 'buy': this.tone(1319, 0.08, 'square', 0.12); this.tone(1760, 0.2, 'square', 0.12, 0, 0.08); this.noise(0.15, 0.1, 6000, 0.05, this.sfxBus, 0, 'highpass'); break;
     }
   },
 
-  // Простая фоновая мелодия: Am – F – C – G
+  // Секвенсор фоновой музыки
   schedule() {
     const c = this.ctx;
-    const midi = n => 440 * Math.pow(2, (n - 69) / 12);
-    const chords = this.boss
-      ? [[57, 60, 64], [58, 62, 65], [55, 58, 62], [56, 59, 64]]
-      : [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+    const tr = TRACKS[this.track] || TRACKS.menu;
     const arp = [0, 1, 2, 1, 0, 2, 1, 2];
-    const lead = [76, 0, 74, 72, 0, 72, 74, 0, 72, 0, 69, 0, 72, 74, 76, 0,
-                  79, 0, 76, 74, 0, 72, 74, 0, 74, 0, 71, 0, 74, 0, 67, 0];
-    const eighth = this.boss ? 0.17 : 0.24;
     while (this.nextTime < c.currentTime + 0.12) {
       const s = this.step, t = this.nextTime;
-      const chord = chords[Math.floor(s / 8) % 4];
-      this.tone(midi(chord[arp[s % 8]] + 12), 0.2, 'triangle', 0.5, 0, 0, this.musicBus, t);
-      if (s % 4 === 0) this.tone(midi(chord[0] - 12), 0.45, 'sine', 0.9, 0, 0, this.musicBus, t);
-      const ln = lead[s % 32];
-      if (ln && (this.boss || Math.floor(s / 32) % 2 === 1)) this.tone(midi(ln), 0.22, 'square', 0.18, 0, 0, this.musicBus, t);
+      const chord = tr.chords[Math.floor(s / 8) % 4];
+      this.tone(midi(chord[arp[s % 8]] + 12), tr.eighth * 0.9, tr.arpType, tr.arpType === 'sawtooth' ? 0.22 : 0.45, 0, 0, this.musicBus, t);
+      if (s % 4 === 0) this.tone(midi(chord[0] - 12), tr.eighth * 1.9, tr.bassType, tr.bassType === 'sine' ? 0.9 : 0.35, 0, 0, this.musicBus, t);
+      if (tr.heavy && s % 2 === 1) this.tone(midi(chord[0] - 12), tr.eighth * 0.8, 'square', 0.2, 0, 0, this.musicBus, t);
+      const ln = tr.lead[s % 32];
+      if (ln && Math.floor(s / 32) % 2 === 1) this.tone(midi(ln), tr.eighth * 1.1, tr.leadType, 0.16, 0, 0, this.musicBus, t);
+      if (tr.drums) {
+        if (s % 4 === 0) this.tone(150, 0.12, 'sine', 0.9, 45, 0, this.musicBus, t);
+        if (s % 8 === 4) this.noise(0.12, 0.35, 1800, 0, this.musicBus, t, 'bandpass');
+        if (s % 2 === 1) this.noise(0.03, 0.18, 7000, 0, this.musicBus, t, 'highpass');
+      }
       this.step++;
-      this.nextTime += eighth;
+      this.nextTime += tr.eighth;
     }
   },
 };
@@ -239,6 +352,7 @@ class Level {
     this.goal = null;
     this.boss = null;
     this.bullets = [];
+    this.powerups = [];
     this.start = { x: TILE, y: TILE };
     this.ice = !!def.ice;
     this.lowGrav = !!def.lowGrav;
@@ -252,8 +366,10 @@ class Level {
           case 'P': this.start = { x: px, y: py }; row[x] = ' '; break;
           case 'C': this.coins.push({ x: px + 8, y: py + 8, w: 16, h: 16, taken: false, phase: Math.random() * 6 }); row[x] = ' '; break;
           case 'E': case 'F': case 'S': case 'J': case 'H': case 'T': case 'W': case 'Q': case 'O': case 'D':
+          case 'N': case 'Y': case 'U': case 'A': case 'R':
             this.enemies.push(makeEnemy(c, px, py)); row[x] = ' '; break;
           case 'Z': this.boss = makeBoss(def.boss || 1, px, py); row[x] = ' '; break;
+          case '!': case '&': case '*': this.powerups.push(makePowerup(c, px, py)); row[x] = ' '; break;
           case 'K': this.checkpoints.push({ x: px + 8, y: py - 32, w: 16, h: 64, active: false }); row[x] = ' '; break;
           case 'G': this.goal = { x: px, y: py - 32, w: 32, h: 64 }; row[x] = ' '; break;
           case 'M': case 'V':
@@ -269,6 +385,7 @@ class Level {
     if (this.boss && this.goal) this.goal.hidden = true;
     this.coinsTotal = this.coins.length;
     this.bonus = 0;
+    this.props = buildProps(this);
     this.time = 0;
     this.deaths = 0;
     this.respawnPoint = { ...this.start };
@@ -308,6 +425,8 @@ const Game = {
   flash: 0,
   lightning: 0,
   texts: [],
+  rings: [],
+  coinCombo: 0, coinT: 0,
   iris: 1,
   menuT: 0,
   timeScale: 1,
@@ -349,6 +468,7 @@ function updateParticles(dt) {
     if (f.life <= 0) Game.texts.splice(i, 1);
   }
   Game.iris = Math.min(1, Game.iris + dt * 2.2);
+  updateRings(dt);
   const ps = Game.particles;
   for (let i = ps.length - 1; i >= 0; i--) {
     const p = ps[i];
@@ -371,7 +491,10 @@ function startLevel(i) {
   Game.iris = 0;
   snapCamera();
   Weather.init(Game.level);
-  Sound.boss = !!LEVELS[i].boss;
+  Sound.setTrack(LEVELS[i].boss ? 'boss' : ['w1', 'w2', 'w3'][Math.min(2, Math.floor(i / 10))]);
+  Sound.setAmbient(Game.level.def.theme === 5 ? 'embers' : Game.level.theme.fx);
+  Game.rings = [];
+  Game.coinCombo = 0; Game.coinT = 0;
   setState('playing');
   UI.updateHud(true);
   UI.updateBoss(Game.level.boss);
@@ -386,9 +509,22 @@ function respawn() {
   emit(Game.player.x + 11, Game.player.y + 14, 18, { color: ['#6fd3ff', '#fff'], grav: 0, speed: 160, life: 0.5 });
 }
 
-function killPlayer() {
+function killPlayer(cause) {
   const p = Game.player;
   if (p.dead) return;
+  if (cause !== 'fall') {
+    if (p.star > 0) return;
+    if (p.shield) {
+      p.shield = false;
+      p.spawnT = 1.2;
+      p.vy = -380;
+      Sound.play('shieldBreak');
+      Game.shake = Math.max(Game.shake, 6);
+      emit(p.x + p.w / 2, p.y + p.h / 2, 24, { color: ['#6fd3ff', '#ffffff'], speed: 280, grav: 0, life: 0.5 });
+      ring(p.x + p.w / 2, p.y + p.h / 2, '#6fd3ff', 50);
+      return;
+    }
+  }
   p.dead = true;
   p.deadT = 0.9;
   Game.level.deaths++;
@@ -511,6 +647,7 @@ function land(p, tx, ty, c) {
   }
   if (!p.wasGround && !p.dead) {
     p.sx = 1.25; p.sy = 0.78;
+    Sound.play('land');
     emit(p.x + p.w / 2, p.y + p.h, 6, { color: '#ffffffaa', angle: -Math.PI / 2, spread: 1.4, speed: 90, grav: 200, life: 0.35 });
   }
   p.bounced = false;
@@ -550,8 +687,8 @@ function updatePlayer(p, dt) {
   } else {
     if (p.wallLock <= 0) {
       let acc = p.onGround ? (dir ? ACC_GROUND : DEC_GROUND) : ACC_AIR;
-      if (L.ice && p.onGround) acc = dir ? 650 : 280;   // лёд: скользко
-      p.vx = approach(p.vx, dir * RUN, acc * dt);
+      if (L.ice && p.onGround && !p.standOn) acc = dir ? 650 : 280;   // лёд скользкий (платформы — нет)
+      p.vx = approach(p.vx, dir * RUN * (p.star > 0 ? 1.3 : 1), acc * dt);
       if (dir) p.face = dir;
     }
     // Гравитация: короткое нажатие — низкий прыжок
@@ -614,10 +751,14 @@ function updatePlayer(p, dt) {
     p.runPhase += dt * Math.abs(p.vx) / 16;
     if (before < 0 && Math.sin(p.runPhase) >= 0) {
       emit(p.x + p.w / 2, p.y + p.h, 2, { color: '#ffffff88', angle: -Math.PI / 2, spread: 1.2, speed: 50, grav: 100, life: 0.3, size: 3 });
+      Sound.play('step');
     }
   }
   p.blinkT -= dt;
   if (p.blinkT < -0.12) p.blinkT = rand(1.5, 4);
+  const idle = p.onGround && Math.abs(p.vx) < 5 && !dir && !Input.is('jump');
+  p.idleT = idle ? (p.idleT || 0) + dt : 0;
+  Game.coinT = Math.max(0, Game.coinT - dt);
   skinTrail(p, dt);
 
   // Шипы
@@ -625,17 +766,20 @@ function updatePlayer(p, dt) {
   const l = Math.floor(hb.x / TILE), r = Math.floor((hb.x + hb.w) / TILE);
   const t = Math.floor(hb.y / TILE), b = Math.floor((hb.y + hb.h) / TILE);
   for (let ty = t; ty <= b; ty++) for (let tx = l; tx <= r; tx++) {
-    if (L.tile(tx, ty) === '^' && overlap(hb, { x: tx * TILE + 5, y: ty * TILE + 14, w: 22, h: 18 })) { killPlayer(); return; }
+    if (L.tile(tx, ty) === '^' && overlap(hb, { x: tx * TILE + 5, y: ty * TILE + 14, w: 22, h: 18 }) && p.spawnT <= 0) { killPlayer(); if (p.dead) return; }
   }
   // Падение в пропасть
-  if (p.y > L.h + 64) { killPlayer(); return; }
+  if (p.y > L.h + 64) { killPlayer('fall'); return; }
 
   // Монеты
   for (const c of L.coins) {
     if (!c.taken && overlap(p, c)) {
       c.taken = true;
       emit(c.x + 8, c.y + 8, 12, { color: ['#ffd54a', '#fff6c2'], speed: 180, grav: 200, life: 0.5 });
-      Sound.play('coin');
+      Game.coinCombo = Game.coinT > 0 ? Game.coinCombo + 1 : 1;
+      Game.coinT = 0.6;
+      Sound.play('coin', Game.coinCombo);
+      ring(c.x + 8, c.y + 8, '#ffd54a', 18);
       UI.updateHud();
     }
   }
@@ -644,6 +788,9 @@ function updatePlayer(p, dt) {
     if (!k.active && overlap(p, k)) {
       L.checkpoints.forEach(o => { o.active = false; });
       k.active = true;
+      k.actT = L.time;
+      ring(k.x + 8, k.y + 20, '#56e39f', 60);
+      floatText(k.x + 8, k.y - 6, 'Чекпоинт!', '#56e39f');
       L.respawnPoint = { x: k.x - 8, y: k.y + 32 };
       emit(k.x + 8, k.y + 6, 20, { color: ['#56e39f', '#fff'], speed: 220, life: 0.7 });
       Sound.play('checkpoint');
@@ -699,6 +846,7 @@ function updateWorld(dt) {
   // Враги, снаряды, босс
   updateEnemies(L, p, dt);
   updateBullets(L, p, dt);
+  updatePowerups(L, p, dt);
   if (L.boss) updateBoss(L, L.boss, p, dt);
 
   updatePlayer(p, dt);
@@ -824,6 +972,7 @@ function drawTiles(L, cam, t) {
       if (c === '#') {
         ctx.fillStyle = th.ground;
         ctx.fillRect(x, y, TILE, TILE);
+        drawBlockPattern(L, tx, ty, x, y);
         ctx.fillStyle = 'rgba(0,0,0,0.12)';
         if ((tx + ty) % 2 === 0) ctx.fillRect(x + 6, y + 14, 6, 6);
         else ctx.fillRect(x + 20, y + 22, 5, 5);
@@ -903,6 +1052,45 @@ function drawTiles(L, cam, t) {
   }
 }
 
+// Узор блока по теме + затемнение в глубине
+const BLOCK_PATTERN = { 2: 'brick', 10: 'brick', 3: 'candy', 7: 'ice', 11: 'tech', 9: 'stone', 5: 'stone', 4: 'stone' };
+function drawBlockPattern(L, tx, ty, x, y) {
+  const pat = BLOCK_PATTERN[L.def.theme] || 'dirt';
+  ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1;
+  if (pat === 'brick') {
+    ctx.beginPath();
+    ctx.moveTo(x, y + 16.5); ctx.lineTo(x + TILE, y + 16.5);
+    const o = ty % 2 ? 0 : 16;
+    ctx.moveTo(x + o + 0.5, y); ctx.lineTo(x + o + 0.5, y + 16);
+    ctx.moveTo(x + ((o + 16) % 32) + 0.5, y + 16); ctx.lineTo(x + ((o + 16) % 32) + 0.5, y + 32);
+    ctx.stroke();
+  } else if (pat === 'stone') {
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    const h = hash(tx * 3.1 + ty * 7.7);
+    ctx.beginPath(); ctx.ellipse(x + 8 + h * 14, y + 12 + h * 8, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.ellipse(x + 22 - h * 10, y + 24, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (pat === 'candy') {
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(x - 4, y + 36); ctx.lineTo(x + 36, y - 4); ctx.stroke();
+  } else if (pat === 'ice') {
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath(); ctx.moveTo(x + 6, y + 30); ctx.lineTo(x + 14, y + 18); ctx.lineTo(x + 26, y + 22); ctx.stroke();
+  } else if (pat === 'tech') {
+    ctx.strokeRect(x + 3.5, y + 3.5, TILE - 7, TILE - 7);
+    ctx.fillStyle = 'rgba(192,140,255,0.25)';
+    ctx.fillRect(x + 5, y + 5, 2, 2); ctx.fillRect(x + 25, y + 25, 2, 2);
+  } else if (hash(tx * 1.3 + ty * 9.1) < 0.07) {
+    // корешки в земле
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x + 10, y + 12); ctx.quadraticCurveTo(x + 16, y + 20, x + 12, y + 28); ctx.stroke();
+  }
+  // чем глубже, тем темнее
+  let depth = 0;
+  while (depth < 4 && L.solid(tx, ty - depth - 1)) depth++;
+  if (depth > 0) { ctx.fillStyle = `rgba(0,0,0,${depth * 0.055})`; ctx.fillRect(x, y, TILE, TILE); }
+}
+
 function drawPlatforms(L) {
   for (const pl of L.platforms) {
     ctx.fillStyle = '#39406a';
@@ -943,13 +1131,17 @@ function drawCheckpoints(L, t) {
     ctx.fillStyle = '#9aa3bd'; ctx.fillRect(bx, k.y + 4, 4, k.h - 4);
     ctx.fillStyle = '#5a6380'; ctx.fillRect(bx - 6, by - 6, 16, 6);
     const col = k.active ? '#56e39f' : '#ff5d73';
+    // флаг поднимается при активации
+    const lift = k.active ? clamp((Game.level.time - (k.actT || 0)) / 0.6, 0, 1) : 0;
+    const fy = k.y + 30 * (1 - lift * (2 - lift));
     ctx.fillStyle = col;
     ctx.beginPath();
     const wave = Math.sin(t * 6) * (k.active ? 3 : 1.5);
-    ctx.moveTo(bx + 4, k.y + 6);
-    ctx.quadraticCurveTo(bx + 14, k.y + 6 + wave, bx + 24, k.y + 12);
-    ctx.quadraticCurveTo(bx + 14, k.y + 18 + wave, bx + 4, k.y + 20);
+    ctx.moveTo(bx + 4, fy + 6);
+    ctx.quadraticCurveTo(bx + 14, fy + 6 + wave, bx + 24, fy + 12);
+    ctx.quadraticCurveTo(bx + 14, fy + 18 + wave, bx + 4, fy + 20);
     ctx.fill();
+    ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(bx + 2, k.y + 4, 3, 0, Math.PI * 2); ctx.fill();
     if (k.active) {
       ctx.fillStyle = 'rgba(86,227,159,0.25)';
       ctx.beginPath(); ctx.arc(bx + 2, k.y + 6, 10 + Math.sin(t * 4) * 2, 0, Math.PI * 2); ctx.fill();
@@ -1003,6 +1195,7 @@ function drawParticles() {
 
 function render(t) {
   const L = Game.level;
+  if (Game.state === 'cutscene') { Cutscene.draw(); return; }
   if (Game.state === 'menu' || !L) { MenuScene.draw(); return; }
   const cam = { x: Game.cam.x, y: Game.cam.y };
   if (Game.shake > 0.1 && Save.data.shake) { cam.x += rand(-Game.shake, Game.shake); cam.y += rand(-Game.shake, Game.shake); }
@@ -1018,8 +1211,10 @@ function render(t) {
   }
   drawPlatforms(L);
   drawTiles(L, cam, t);
+  drawProps(L, cam, t);
   drawLiquid(L, cam, t);
   drawCheckpoints(L, t);
+  drawPowerups(L, t);
   drawGoal(L, t);
   drawCoins(L, t);
   drawEnemies(L, t);
@@ -1029,8 +1224,27 @@ function render(t) {
   const p = Game.player;
   if (p && Game.state !== 'menu') {
     for (const tr of p.trail) drawRobot({ ...p, face: tr.face }, tr.x, tr.y, tr.life * 1.6, true);
+    if (Game.state === 'complete' && !p.dead) {
+      // победный танец
+      p.celebY = p.celebY ?? p.y;
+      p.y = p.celebY - Math.abs(Math.sin(t * 6)) * 18;
+      p.onGround = false;
+      p.face = Math.sin(t * 3) > 0 ? 1 : -1;
+    }
     if (!p.dead && !(p.spawnT > 0 && Math.floor(p.spawnT * 20) % 2 === 0)) drawRobot(p, p.x, p.y);
+    drawPlayerPowers(p, t);
+    if (p.idleT > 4 && !p.dead) {
+      // робот задремал
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center';
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 0.6 + k / 3) % 1;
+        ctx.globalAlpha = 1 - ph;
+        ctx.fillText('z', p.x + p.w + 4 + ph * 14 + Math.sin(ph * 6) * 3, p.y - 6 - ph * 26);
+      }
+      ctx.globalAlpha = 1;
+    }
   }
+  drawRings();
   drawParticles();
   drawTexts();
 
@@ -1069,10 +1283,11 @@ const UI = {
   last: {},
 
   show(name) {
-    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats']) {
+    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats', 'wheel']) {
       $('screen-' + s).classList.toggle('hidden', s !== name);
     }
     this.shopOpen = name === 'shop';
+    Wheel.open = name === 'wheel';
   },
 
   // ---------- Магазин скинов ----------
@@ -1116,7 +1331,7 @@ const UI = {
           Save.data.skins.push(skin.id);
           Save.data.skin = skin.id;
           Save.store();
-          Sound.play('win');
+          Sound.play('buy');
           this.toast(`<span class="t-title">Новый скин!</span>${skin.name} — теперь твой`, 2200);
         } else {
           Sound.play('death');
@@ -1189,6 +1404,7 @@ const UI = {
       coins: `${L.coinsTaken}/${L.coinsTotal}`,
       time: fmtTime(L.time),
       deaths: String(L.deaths),
+      powers: powerHud(Game.player),
     };
     for (const k in vals) {
       if (force || this.last[k] !== vals[k]) { $('hud-' + k).textContent = vals[k]; this.last[k] = vals[k]; }
@@ -1239,7 +1455,7 @@ const UI = {
         <span class="name">${locked ? '🔒 ' : lv.boss ? '👑 ' : ''}${lv.name}</span>
         <span class="lstars">${'★'.repeat(st)}<span style="opacity:.3">${'★'.repeat(3 - st)}</span></span>
         <span class="best">${best ? 'Рекорд: ' + fmtTime(best.time) + ' с' : 'Цель: ' + lv.par + ' с'}</span>`;
-      b.addEventListener('click', () => { Sound.init(); Sound.play('click'); startLevel(i); });
+      b.addEventListener('click', () => { Sound.init(); Sound.play('click'); playLevel(i); });
       grid.appendChild(b);
     });
   },
@@ -1258,7 +1474,7 @@ const UI = {
       <span>Цель по времени</span><b>${L.def.par} с ${r.fast ? '✔' : ''}</b>
       <span>Падения</span><b>${L.deaths}</b>
       <span>Награда</span><b class="new">+${r.reward} 🪙</b>`;
-    $('btn-next').classList.toggle('hidden', last);
+    $('btn-next').textContent = last ? '🎬 Финал' : 'Дальше ▶';
     setTimeout(() => this.show('complete'), 700);
   },
 };
@@ -1269,7 +1485,7 @@ function setState(s) {
   $('btn-pause').classList.toggle('hidden', s !== 'playing');
   if (s !== 'playing' && s !== 'paused') $('bossbar').classList.add('hidden');
   $('touch').classList.toggle('hidden', !(s === 'playing' && isTouch()));
-  if (s === 'playing') UI.show(null);
+  if (s === 'playing' || s === 'cutscene') UI.show(null);
   if (s !== 'playing') Input.touch = {};
 }
 
@@ -1283,7 +1499,9 @@ function goMenu() {
   Game.level = null;
   Game.particles = [];
   MenuScene.reset();
-  Sound.boss = false;
+  Sound.setTrack('menu');
+  Sound.setAmbient(null);
+  Wheel.open = false;
   UI.updateBoss(null);
   Game.player = null;
   setState('menu');
@@ -1300,9 +1518,11 @@ function handleAction(a) {
       // первый непройденный открытый уровень
       let i = 0;
       while (i < LEVELS.length - 1 && Save.data.best[i] && i + 1 < Save.data.unlocked) i++;
-      startLevel(i);
+      playLevel(i);
       break;
     }
+    case 'wheel': Wheel.show(); UI.show('wheel'); break;
+    case 'story': Cutscene.play('intro', goMenu); break;
     case 'levels': UI.buildLevels(); if (Game.state === 'paused' || Game.state === 'complete') goMenu(); UI.show('levels'); break;
     case 'howto': UI.show('howto'); break;
     case 'shop': UI.buildShop(); UI.show('shop'); break;
@@ -1321,7 +1541,10 @@ function handleAction(a) {
     case 'menu': goMenu(); break;
     case 'resume': resume(); break;
     case 'restart': startLevel(Game.level.index); break;
-    case 'next': startLevel(Math.min(Game.level.index + 1, LEVELS.length - 1)); break;
+    case 'next':
+      if (Game.level.index === LEVELS.length - 1) Cutscene.play('ending', goMenu);
+      else playLevel(Game.level.index + 1);
+      break;
     case 'toggle-sound': Save.data.muted = !Save.data.muted; Save.store(); Sound.apply(); UI.refreshToggles(); break;
     case 'toggle-music': Save.data.music = !Save.data.music; Save.store(); Sound.apply(); UI.refreshToggles(); break;
   }
@@ -1333,12 +1556,28 @@ document.addEventListener('click', e => {
   if (b) handleAction(b.dataset.action);
 });
 $('btn-pause').addEventListener('click', () => { Sound.init(); pause(); });
+$('btn-spin').addEventListener('click', () => Wheel.spin());
+$('cutscene').addEventListener('click', e => { if (e.target.id !== 'cs-skip') Cutscene.next(); });
+$('cs-skip').addEventListener('click', () => { Sound.play('click'); Cutscene.finish(); });
+let hoverT = 0;
+document.addEventListener('pointerover', e => {
+  if (e.target.closest && e.target.closest('.btn, .level-card, .skin-card') && performance.now() - hoverT > 60) {
+    hoverT = performance.now(); Sound.play('hover');
+  }
+});
 $('set-sfx').addEventListener('input', e => { Save.data.sfxVol = e.target.value / 100; Save.store(); Sound.init(); Sound.apply(); });
 $('set-sfx').addEventListener('change', () => Sound.play('coin'));
 $('set-music').addEventListener('input', e => { Save.data.musicVol = e.target.value / 100; Save.store(); Sound.init(); Sound.apply(); });
 $('set-shake').addEventListener('change', e => { Save.data.shake = e.target.checked; Save.store(); });
 
 window.addEventListener('keydown', e => {
+  if (Game.state === 'cutscene') {
+    Sound.init();
+    if (e.code === 'Escape') Cutscene.finish();
+    else if (!e.repeat && (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyX' || e.code === 'KeyZ')) Cutscene.next();
+    e.preventDefault();
+    return;
+  }
   const a = KEYMAP[e.code];
   if (a) {
     if (!Input.keys[a]) Input.latch[a] = true;
@@ -1403,9 +1642,14 @@ function frame(now) {
   } else {
     acc = 0;
     updateParticles(dt);
+    if (Game.state === 'cutscene') {
+      Cutscene.update(dt);
+      MenuScene.t += dt; MenuScene.dist += dt * 25;
+    }
     if (Game.state === 'menu') {
       MenuScene.update(dt);
       UI.animateShop(dt);
+      Wheel.update(dt);
     }
   }
   if (Game.level && Game.state !== 'paused') Weather.update(dt, Game.cam);

@@ -18,6 +18,7 @@
       <span class="pill">🪙 <b id="hud-coins">0/0</b></span>
       <span class="pill">⏱ <b id="hud-time">0.0</b></span>
       <span class="pill">💀 <b id="hud-deaths">0</b></span>
+      <span class="pill powers"><b id="hud-powers"></b></span>
       <button id="btn-pause" class="icon-btn" aria-label="Пауза">⏸</button>
     </div>
   </div>
@@ -43,6 +44,8 @@
         <button class="btn" data-action="stats">📊 Статистика</button>
         <button class="btn" data-action="howto">🎮 Управление</button>
         <button class="btn unlock-btn" data-action="unlock-all">🔓 Открыть все уровни</button>
+        <button class="btn wheel-btn" data-action="wheel">🎡 Колесо фортуны</button>
+        <button class="btn" data-action="story">🎬 Сюжет</button>
       </div>
       <div class="row">
         <button class="btn small" data-action="toggle-sound" id="btn-sound">🔊 Звук</button>
@@ -62,8 +65,21 @@
           <p class="hint">Монеты копятся за прохождение уровней: собранные монеты, побеждённые враги, звёзды и боссы.</p>
         </div>
       </div>
+      <button class="btn wheel-btn" data-action="wheel">🎡 Колесо фортуны — 3 бесплатные попытки каждый день!</button>
       <div id="shop-grid" class="shop-grid"></div>
       <button class="btn" data-action="menu">← Назад</button>
+    </div>
+  </section>
+
+  <!-- Колесо фортуны -->
+  <section id="screen-wheel" class="screen hidden">
+    <div class="panel">
+      <h2>🎡 Колесо фортуны</h2>
+      <p class="hint">Попыток сегодня: <b id="wheel-left">3</b> · в копилке 🪙 <b id="wheel-wallet">0</b></p>
+      <canvas id="wheel-canvas" width="320" height="320"></canvas>
+      <div id="wheel-result" class="wheel-result"></div>
+      <button class="btn primary big" id="btn-spin">🎡 Крутить!</button>
+      <button class="btn" data-action="shop">← В магазин</button>
     </div>
   </section>
 
@@ -161,6 +177,17 @@
     </div>
   </section>
 
+  <!-- Кат-сцена -->
+  <div id="cutscene" class="hidden">
+    <div id="cs-title" class="cs-title hidden"></div>
+    <button id="cs-skip" class="cs-skip">Пропустить ⏭</button>
+    <div class="cs-box">
+      <div id="cs-who" class="cs-who"></div>
+      <div id="cs-text" class="cs-text"></div>
+      <div class="cs-next">▶ Далее (Пробел / клик)</div>
+    </div>
+  </div>
+
   <!-- Сенсорное управление -->
   <div id="touch" class="hidden">
     <div class="touch-left">
@@ -181,6 +208,10 @@
   <script src="skins.js"></script>
   <script src="decor.js"></script>
   <script src="menu.js"></script>
+  <script src="powerups.js"></script>
+  <script src="props.js"></script>
+  <script src="cutscene.js"></script>
+  <script src="wheel.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

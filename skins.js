@@ -100,7 +100,9 @@ function drawRobot(p, x, y, alpha = 1, ghost = false, g = ctx, skin = currentSki
   c.save();
   c.globalAlpha = alpha * (skin.alpha || 1);
   c.translate(x + p.w / 2, y + p.h);
-  c.scale(p.sx * p.face, p.sy);
+  // дыхание в покое
+  const breath = p.idleT > 0.3 ? 1 + Math.sin(t * (p.idleT > 4 ? 2 : 4)) * 0.035 : 1;
+  c.scale(p.sx * p.face, p.sy * breath);
   const body = ghost ? skin.dark : skinBody(skin, t), dark = ghost ? body : skin.dark;
   const moving = p.onGround && Math.abs(p.vx) > 20;
   const sw = moving ? Math.sin(p.runPhase) : 0;
@@ -128,7 +130,7 @@ function drawRobot(p, x, y, alpha = 1, ghost = false, g = ctx, skin = currentSki
   c.fillStyle = '#16203f';
   roundRect(c, -6, -23, 16, 10, 4); c.fill();
   if (!ghost) {
-    const blink = p.blinkT < 0;
+    const blink = p.blinkT < 0 || p.idleT > 4;
     c.fillStyle = p.dead ? '#ff5d73' : skin.eye;
     if (blink) { c.fillRect(-2, -18, 4, 1.5); c.fillRect(4, -18, 4, 1.5); }
     else { c.fillRect(-2, -21, 4, 6); c.fillRect(4, -21, 4, 6); }

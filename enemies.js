@@ -17,6 +17,11 @@ const ENEMY_INFO = {
   ghost:   { stomp: false, dash: true,  color: '#e8f0ff' },
   saw:     { stomp: false, dash: false, color: '#c9d1e0' },
   dropper: { stomp: false, dash: false, safeTop: true, color: '#7c8296' },
+  snail:   { stomp: true,  dash: true,  color: '#e0a23b' },
+  slime:   { stomp: true,  dash: true,  color: '#4fd1c5' },
+  spider:  { stomp: true,  dash: true,  color: '#3a2d4a' },
+  bomber:  { stomp: true,  dash: true,  color: '#5a7a3a' },
+  launcher:{ stomp: true,  dash: true,  color: '#5a6078' },
 };
 
 function makeEnemy(c, px, py) {
@@ -32,6 +37,11 @@ function makeEnemy(c, px, py) {
     case 'Q': return { ...base, type: 'ghost', x: px + 2, y: py + 2, w: 28, h: 28 };
     case 'O': return { ...base, type: 'saw', cx: px + 16, cy: py + 16, x: px + 2, y: py + 2, w: 28, h: 28 };
     case 'D': return { ...base, type: 'dropper', x0: px + 1, y0: py, x: px + 1, y: py, w: 30, h: 30, state: 'idle' };
+    case 'N': return { ...base, type: 'snail', x: px + 2, y: py + TILE - 22, w: 28, h: 22, vx: -45, state: 'walk' };
+    case 'Y': return { ...base, type: 'slime', x: px + 1, y: py + TILE - 22, w: 30, h: 22, big: true, timer: rand(0.3, 1) };
+    case 'U': return { ...base, type: 'spider', x: px + 4, y0: py, y: py, w: 24, h: 20, anchor: Math.max(0, py - TILE * 4) };
+    case 'A': return { ...base, type: 'bomber', x: px + 3, y: py + TILE - 26, w: 26, h: 26, vx: -30, timer: rand(1, 2.5) };
+    case 'R': return { ...base, type: 'launcher', x: px + 1, y: py + TILE - 24, w: 30, h: 24, timer: rand(1, 2.5) };
   }
   return null;
 }
@@ -78,7 +88,11 @@ function updateEnemies(L, p, dt) {
   const pcx = p.x + p.w / 2, pcy = p.y + p.h / 2;
   for (const e of L.enemies) {
     e.t += dt;
-    if (!e.alive) { e.deadT -= dt; continue; }
+    if (!e.alive) {
+      e.deadT -= dt;
+      if (e.deathMode === 'fly') { e.dvy += GRAVITY * dt; e.x += e.dvx * dt; e.y += e.dvy * dt; e.rot += e.dvx * dt * 0.06; }
+      continue;
+    }
     const dx = pcx - (e.x + e.w / 2), dy = pcy - (e.y + e.h / 2);
     const near = !p.dead && Math.abs(dx) < 14 * TILE && Math.abs(dy) < 8 * TILE;
 
@@ -101,6 +115,7 @@ function updateEnemies(L, p, dt) {
             e.vx = L.solid(landX, footY) ? e.face * 150 : 0;
             e.vy = -620;
             e.grounded = false;
+            if (onScreen(e.x, e.y)) Sound.play('croak');
             e.timer = rand(1, 1.6);
           }
         }
@@ -126,6 +141,7 @@ function updateEnemies(L, p, dt) {
           groundMove(L, e, dt);
           if (!p.dead && Math.abs(dx) < 7 * TILE && Math.abs(dy) < 40 && Math.sign(dx) === e.face) {
             e.state = 'wind'; e.timer = 0.45; e.vx = 0;
+            Sound.play('snort');
           }
         }
         break;
@@ -173,6 +189,7 @@ function updateEnemies(L, p, dt) {
       case 'ghost': {
         // призрак двигается, только когда робот стоит к нему спиной
         const behind = (p.face > 0 && dx > 0) || (p.face < 0 && dx < 0);
+        if (e.shy && behind && onScreen(e.x, e.y)) Sound.play('woo');
         e.shy = !behind;
         if (behind && !p.dead && Math.abs(dx) < 12 * TILE && Math.abs(dy) < 8 * TILE) {
           const d = Math.hypot(dx, dy) || 1;
@@ -188,6 +205,76 @@ function updateEnemies(L, p, dt) {
         e.y = e.cy + Math.sin(a) * 48 - e.h / 2;
         break;
       }
+
+      case 'snail':
+        if (e.state === 'walk') groundMove(L, e, dt);
+        else if (e.state === 'slide') {
+          groundMove(L, e, dt, false);
+          // скользящий панцирь сбивает других врагов
+          for (const o of L.enemies) {
+            if (o !== e && o.alive && ENEMY_INFO[o.type].dash && overlap(e, o)) killEnemy(o, null, false);
+          }
+          if (Math.random() < 0.5) emit(e.x + e.w / 2, e.y + e.h, 1, { color: '#ffffff88', speed: 40, grav: 50, life: 0.3 });
+        } else {
+          groundMove(L, e, dt);
+          e.timer -= dt;
+          if (e.timer <= 0) { e.state = 'walk'; e.y -= 6; e.h = 22; e.vx = e.face * 45; }
+        }
+        break;
+
+      case 'slime':
+        groundMove(L, e, dt, false);
+        if (e.grounded) {
+          e.vx = 0;
+          e.timer -= dt;
+          if (e.timer <= 0) {
+            const dir = near ? (dx > 0 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
+            const ahead = Math.floor((e.x + e.w / 2 + dir * 50) / TILE);
+            if (L.solid(ahead, Math.floor((e.y + e.h + 4) / TILE))) e.vx = dir * (e.big ? 80 : 120);
+            e.vy = e.big ? -340 : -300;
+            e.face = dir;
+            e.timer = rand(0.6, 1.2);
+          }
+        }
+        break;
+
+      case 'spider': {
+        const want = !p.dead && Math.abs(dx) < 3 * TILE && dy > -TILE ? e.y0 + TILE * 4 : e.y0;
+        if (want > e.y0 && e.state !== 'down') { e.state = 'down'; if (onScreen(e.x, e.y)) Sound.play('hiss'); }
+        if (want === e.y0) e.state = 'up';
+        e.y = e.y < want ? Math.min(want, e.y + 170 * dt) : Math.max(want, e.y - 70 * dt);
+        break;
+      }
+
+      case 'bomber':
+        if (e.state === 'throw') {
+          e.timer -= dt;
+          if (e.timer <= 0) { e.state = ''; e.vx = e.face * 30; e.timer = rand(2.2, 3); }
+          groundMove(L, e, dt);
+        } else {
+          groundMove(L, e, dt);
+          e.timer -= dt;
+          if (e.timer <= 0 && near && Math.abs(dx) < 9 * TILE) {
+            e.face = dx > 0 ? 1 : -1; e.vx = 0; e.state = 'throw'; e.timer = 0.5;
+            const T = 1.0, g = 900;
+            L.bullets.push({ kind: 'bomb', x: e.x + e.w / 2, y: e.y, vx: clamp(dx / T, -320, 320), vy: -0.5 * g * T + clamp(dy, -200, 200) / T, grav: g, r: 7, life: 4 });
+            Sound.play('throw');
+          } else if (e.timer <= 0) e.timer = 0.5;
+        }
+        break;
+
+      case 'launcher':
+        if (near) e.face = dx > 0 ? 1 : -1;
+        e.timer -= dt;
+        if (e.timer <= 0) {
+          e.timer = 3.2;
+          if (near && Math.abs(dx) < 12 * TILE) {
+            L.bullets.push({ kind: 'rocket', x: e.x + e.w / 2 + e.face * 18, y: e.y + 9, vx: e.face * 170, vy: 0, r: 6, life: 5 });
+            Sound.play('launch');
+            emit(e.x + e.w / 2 + e.face * 18, e.y + 9, 8, { color: ['#ccc', '#fff'], speed: 80, grav: -50, life: 0.5 });
+          }
+        }
+        break;
 
       case 'dropper':
         if (e.state === 'shake') {
@@ -221,13 +308,18 @@ function updateEnemies(L, p, dt) {
 
 function killEnemy(e, p, stomped) {
   e.alive = false;
-  e.deadT = 0.6;
+  e.deadT = stomped ? 0.5 : 1.2;
+  e.deathMode = stomped ? 'squash' : 'fly';
+  e.dvx = (p ? Math.sign(e.x - p.x) || 1 : (Math.random() < 0.5 ? -1 : 1)) * rand(120, 220);
+  e.dvy = -rand(380, 480);
+  e.rot = 0;
   emit(e.x + e.w / 2, e.y + e.h / 2, 18, { color: [ENEMY_INFO[e.type].color, '#ffffff', '#333344'], speed: 260, life: 0.6 });
   Game.shake = Math.max(Game.shake, 6);
   Sound.play('stomp');
   Game.level.bonus++;
   Save.data.stats.kills++;
   floatText(e.x + e.w / 2, e.y - 4, '+1 🪙');
+  if (!p) return;
   if (stomped) {
     p.vy = Input.is('jump') ? -STOMP_V * 1.25 : -STOMP_V;
     p.bounced = true; p.jumps = 1; p.canDash = true; p.sx = 0.8; p.sy = 1.2;
@@ -244,6 +336,12 @@ function enemyContact(L, p, dt) {
       : { x: e.x + 2, y: e.y + 2, w: e.w - 4, h: e.h - 2 };
     if (!overlap(p, eb)) continue;
     const fromAbove = p.vy > 0 && (p.y + p.h) - p.vy * dt <= e.y + 10;
+    if (p.star > 0) { killEnemy(e, p, false); continue; }
+    if (e.type === 'snail' && p.dashT <= 0) {
+      if (snailContact(L, e, p, fromAbove)) return true;
+      continue;
+    }
+    if (e.type === 'slime' && e.big && fromAbove && p.dashT <= 0) { splitSlime(L, e, p); continue; }
     if (p.dashT > 0 && info.dash) {
       killEnemy(e, p, false);
     } else if (fromAbove && info.stomp) {
@@ -262,12 +360,66 @@ function enemyContact(L, p, dt) {
   return false;
 }
 
+function bounceOff(p, k = 1) {
+  p.vy = (Input.is('jump') ? -STOMP_V * 1.25 : -STOMP_V) * k;
+  p.bounced = true; p.jumps = 1; p.canDash = true; p.sx = 0.8; p.sy = 1.2;
+}
+
+// Улитка: растоптал — панцирь, коснулся панциря — пнул, скользящий панцирь опасен сбоку
+function snailContact(L, e, p, fromAbove) {
+  if (e.state === 'walk') {
+    if (fromAbove) {
+      e.state = 'shell'; e.y += 6; e.h = 16; e.vx = 0; e.timer = 5;
+      Sound.play('stomp'); bounceOff(p);
+      emit(e.x + e.w / 2, e.y, 8, { color: ['#e0a23b', '#fff'], speed: 150, life: 0.4 });
+      return false;
+    }
+  } else if (e.state === 'shell') {
+    const dir = (p.x + p.w / 2) < (e.x + e.w / 2) ? 1 : -1;
+    e.state = 'slide'; e.vx = dir * 420; e.face = dir; e.timer = 0;
+    e.x += dir * 6;
+    Sound.play('kick');
+    if (fromAbove) bounceOff(p, 0.8);
+    p.spawnT = Math.max(p.spawnT, 0.15);
+    return false;
+  } else if (e.state === 'slide') {
+    if (fromAbove) { e.state = 'shell'; e.vx = 0; e.timer = 5; Sound.play('stomp'); bounceOff(p); return false; }
+  }
+  if (p.spawnT > 0) return false;
+  killPlayer();
+  return true;
+}
+
+function splitSlime(L, e, p) {
+  e.alive = false; e.deadT = 0.3; e.deathMode = 'squash';
+  for (const dir of [-1, 1]) {
+    const c = makeEnemy('Y', 0, 0);
+    Object.assign(c, { x: e.x + e.w / 2 - 9 + dir * 6, y: e.y + e.h - 14, w: 18, h: 14, big: false, vx: dir * 140, vy: -320, face: dir, timer: 0.8 });
+    L.enemies.push(c);
+  }
+  emit(e.x + e.w / 2, e.y + e.h / 2, 14, { color: ['#4fd1c5', '#c8fff8'], speed: 200, life: 0.5 });
+  Sound.play('squish');
+  Game.level.bonus++;
+  bounceOff(p);
+}
+
 // ---------- Снаряды ----------
 function updateBullets(L, p, dt) {
   for (let i = L.bullets.length - 1; i >= 0; i--) {
     const b = L.bullets[i];
     b.life -= dt;
     if (b.grav) b.vy += b.grav * dt;
+    if (b.kind === 'rocket' && !p.dead) {
+      const sp = Math.hypot(b.vx, b.vy);
+      let a = Math.atan2(b.vy, b.vx);
+      const want = Math.atan2(p.y + p.h / 2 - b.y, p.x + p.w / 2 - b.x);
+      let d = want - a;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      a += clamp(d, -1.3 * dt, 1.3 * dt);
+      b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
+      if (Math.random() < 0.5) emit(b.x - Math.cos(a) * 8, b.y - Math.sin(a) * 8, 1, { color: ['#ffd54a', '#ff7a3d', '#aaa'], speed: 30, grav: -30, life: 0.35 });
+    }
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     let dead = b.life <= 0 || b.y > L.h + 100;
@@ -277,9 +429,13 @@ function updateBullets(L, p, dt) {
       if (!dead && !p.dead && p.spawnT <= 0 && overlap(p, { x: b.x + 3, y: b.y + 6, w: b.w - 6, h: b.h - 6 })) killPlayer();
     } else {
       if (b.y > 0 && L.solid(Math.floor(b.x / TILE), Math.floor(b.y / TILE))) dead = true;
-      if (!dead && !p.dead && p.spawnT <= 0) {
+      if (!dead && !p.dead) {
         const cx = clamp(b.x, p.x + 2, p.x + p.w - 2), cy = clamp(b.y, p.y + 2, p.y + p.h);
-        if ((b.x - cx) ** 2 + (b.y - cy) ** 2 < b.r * b.r) { killPlayer(); dead = true; }
+        if ((b.x - cx) ** 2 + (b.y - cy) ** 2 < (b.r + 2) ** 2) {
+          if ((b.kind === 'rocket' && p.vy > 0 && p.y + p.h - p.vy * dt <= b.y + 4) || p.star > 0) {
+            bounceOff(p); dead = true; Sound.play('stomp'); Game.level.bonus++; floatText(b.x, b.y - 8, '+1 🪙');
+          } else if (p.spawnT <= 0) { killPlayer(); dead = true; }
+        }
       }
     }
     if (dead) {
@@ -305,6 +461,17 @@ function drawBullets(L, t) {
       ctx.moveTo(b.x, b.y + b.h);
       ctx.quadraticCurveTo(b.x + b.w / 2, b.y - 6 + Math.sin(t * 30) * 3, b.x + b.w, b.y + b.h);
       ctx.fill();
+      continue;
+    }
+    if (b.kind === 'rocket') {
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.fillStyle = Math.sin(t * 40) > 0 ? '#ffd54a' : '#ff7a3d';
+      ctx.beginPath(); ctx.moveTo(-8, -3); ctx.lineTo(-15 - Math.random() * 5, 0); ctx.lineTo(-8, 3); ctx.fill();
+      ctx.fillStyle = '#d8dde8'; roundRect(ctx, -9, -4, 16, 8, 3); ctx.fill();
+      ctx.fillStyle = '#ff3b3b';
+      ctx.beginPath(); ctx.moveTo(7, -4); ctx.lineTo(12, 0); ctx.lineTo(7, 4); ctx.fill();
+      ctx.fillRect(-9, -6, 4, 12);
+      ctx.restore();
       continue;
     }
     const col = b.kind === 'orb' ? '#c06bff' : b.kind === 'bomb' ? '#2a2a3a' : '#ff8a3d';
@@ -348,10 +515,11 @@ function drawEnemy(e, t) {
         ctx.beginPath(); ctx.moveTo(-10, -20); ctx.lineTo(-7, -27); ctx.lineTo(-4, -21); ctx.fill();
         ctx.beginPath(); ctx.moveTo(10, -20); ctx.lineTo(7, -27); ctx.lineTo(4, -21); ctx.fill();
       }
+      const blink = (e.t % 3.3) < 0.12;
       ctx.fillStyle = '#fff';
-      ctx.fillRect(-7 + face * 3, -16, 5, 6); ctx.fillRect(2 + face * 3, -16, 5, 6);
+      ctx.fillRect(-7 + face * 3, blink ? -13 : -16, 5, blink ? 1.5 : 6); ctx.fillRect(2 + face * 3, blink ? -13 : -16, 5, blink ? 1.5 : 6);
       ctx.fillStyle = '#1b1b2a';
-      ctx.fillRect(-5 + face * 4, -14, 2, 3); ctx.fillRect(4 + face * 4, -14, 2, 3);
+      if (!blink) { ctx.fillRect(-5 + face * 4, -14, 2, 3); ctx.fillRect(4 + face * 4, -14, 2, 3); }
       ctx.fillStyle = dark;
       ctx.fillRect(-8 + face * 3, -18, 6, 2); ctx.fillRect(2 + face * 3, -18, 6, 2);
       break;
@@ -487,6 +655,100 @@ function drawEnemy(e, t) {
       ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
       break;
     }
+    case 'snail': {
+      ctx.scale(face, 1);
+      const shell = e.state !== 'walk';
+      if (!shell) {
+        ctx.fillStyle = '#f2d28a';
+        const stretch = Math.sin(e.t * 6) * 2;
+        roundRect(ctx, -14, -8, 28 + stretch, 8, 4); ctx.fill();
+        ctx.fillRect(9, -16, 4, 9);
+        ctx.fillStyle = '#1b1b2a'; ctx.beginPath(); ctx.arc(11 + stretch / 2, -17, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.save();
+      if (e.state === 'slide') ctx.rotate(e.t * 20 * Math.sign(e.vx || 1) * face);
+      ctx.translate(0, shell ? -8 : -14);
+      ctx.fillStyle = '#e0a23b';
+      ctx.beginPath(); ctx.arc(0, 0, shell ? 8 : 10, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8a5a14'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let k = 0; k < 20; k++) { const a = k * 0.6, r = 1 + k * 0.4 * (shell ? 0.8 : 1); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.stroke();
+      ctx.restore();
+      if (e.state === 'shell' && e.timer < 1.5 && Math.sin(e.t * 30) > 0) {
+        ctx.fillStyle = '#1b1b2a'; ctx.fillRect(-3, -6, 2, 2); ctx.fillRect(2, -6, 2, 2);
+      }
+      break;
+    }
+    case 'slime': {
+      const sq = e.grounded ? 1 + Math.sin(e.t * 8) * 0.08 : 0.85;
+      const w = e.w / 2, h = e.h;
+      ctx.scale(1 / sq, sq);
+      ctx.fillStyle = 'rgba(79,209,197,0.85)';
+      ctx.beginPath();
+      ctx.moveTo(-w, 0);
+      ctx.quadraticCurveTo(-w, -h, 0, -h);
+      ctx.quadraticCurveTo(w, -h, w, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath(); ctx.ellipse(-w * 0.4, -h * 0.7, w * 0.2, h * 0.12, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#123';
+      ctx.fillRect(-w * 0.35 + face * 2, -h * 0.55, 3, 4); ctx.fillRect(w * 0.15 + face * 2, -h * 0.55, 3, 4);
+      ctx.fillRect(-w * 0.15 + face * 2, -h * 0.3, w * 0.35, 2);
+      break;
+    }
+    case 'spider': {
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(230,230,240,0.6)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(e.x + e.w / 2, e.anchor); ctx.lineTo(e.x + e.w / 2, e.y + 4); ctx.stroke();
+      ctx.save(); ctx.translate(e.x + e.w / 2, e.y + e.h / 2);
+      ctx.strokeStyle = '#2a1f38'; ctx.lineWidth = 2;
+      for (let k = 0; k < 4; k++) {
+        const wig = Math.sin(e.t * 12 + k) * 3;
+        for (const sdir of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(0, -2 + k * 2);
+          ctx.lineTo(sdir * 10, -8 + k * 4 + wig); ctx.lineTo(sdir * 14, 2 + k * 3 + wig); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = '#3a2d4a';
+      ctx.beginPath(); ctx.arc(0, 2, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -6, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff3b3b';
+      ctx.fillRect(-4, -8, 2, 2); ctx.fillRect(2, -8, 2, 2); ctx.fillRect(-2, -5, 1.5, 1.5); ctx.fillRect(1, -5, 1.5, 1.5);
+      ctx.fillStyle = '#ff5d8f'; ctx.fillRect(-3, 4, 6, 2);
+      break;
+    }
+    case 'bomber': {
+      ctx.scale(face, 1);
+      const throwing = e.state === 'throw';
+      const step = Math.sin(e.t * 8) * 2;
+      ctx.fillStyle = '#3a4a24';
+      ctx.fillRect(-9 + step, -6, 6, 6); ctx.fillRect(3 - step, -6, 6, 6);
+      ctx.fillStyle = '#5a7a3a';
+      roundRect(ctx, -12, -22, 24, 17, 6); ctx.fill();
+      ctx.fillStyle = '#7a9a4a'; roundRect(ctx, -12, -27, 24, 8, 4); ctx.fill();
+      ctx.fillStyle = '#2b2f40'; ctx.fillRect(-12, -22, 24, 3);
+      ctx.fillStyle = '#fff'; ctx.fillRect(3, -18, 5, 5);
+      ctx.fillStyle = '#111'; ctx.fillRect(6, -17, 2, 3);
+      ctx.save(); ctx.translate(-8, -18); ctx.rotate(throwing ? -2.2 + (0.5 - e.timer) * 6 : Math.sin(e.t * 4) * 0.2);
+      ctx.fillStyle = '#5a7a3a'; ctx.fillRect(-2, 0, 4, 10);
+      if (!throwing || e.timer > 0.35) { ctx.fillStyle = '#2a2a3a'; ctx.beginPath(); ctx.arc(0, 12, 4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      break;
+    }
+    case 'launcher': {
+      ctx.fillStyle = '#3a3f55'; roundRect(ctx, -15, -14, 30, 14, 4); ctx.fill();
+      ctx.fillStyle = '#ffd54a';
+      for (let k = 0; k < 4; k++) ctx.fillRect(-13 + k * 7, -4, 4, 2);
+      ctx.save(); ctx.translate(0, -16); ctx.scale(face, 1);
+      ctx.fillStyle = '#5a6078'; roundRect(ctx, -8, -8, 26, 12, 4); ctx.fill();
+      ctx.fillStyle = '#2b2f40'; ctx.fillRect(14, -6, 5, 8);
+      const charge = e.timer < 0.6 && Math.sin(t * 30) > 0;
+      ctx.fillStyle = charge ? '#ff3b3b' : '#8ff7ff';
+      ctx.beginPath(); ctx.arc(0, -2, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      break;
+    }
     case 'dropper': {
       ctx.restore();
       ctx.save();
@@ -514,10 +776,20 @@ function drawEnemy(e, t) {
 function drawEnemies(L, t) {
   for (const e of L.enemies) {
     if (!e.alive) {
-      if (e.deadT <= 0) continue;
-      ctx.globalAlpha = Math.max(0, e.deadT / 0.6);
-      ctx.fillStyle = ENEMY_INFO[e.type].color;
-      roundRect(ctx, e.x, e.y + e.h - 6, e.w, 6, 3); ctx.fill();
+      if (e.deadT <= 0 || e.type === 'saw' || e.type === 'dropper' || e.type === 'spider') {
+        if (e.deadT > 0 && e.type === 'spider') { ctx.globalAlpha = Math.min(1, e.deadT * 2); }
+        else continue;
+      }
+      const cx = e.x + e.w / 2, by = e.y + e.h;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, e.deadT * 3);
+      if (e.deathMode === 'fly') {
+        ctx.translate(cx, e.y + e.h / 2); ctx.rotate(e.rot || 0); ctx.scale(1, -1); ctx.translate(-cx, -(e.y + e.h / 2));
+      } else {
+        ctx.translate(cx, by); ctx.scale(1.35, 0.3); ctx.translate(-cx, -by);
+      }
+      drawEnemy(e, t);
+      ctx.restore();
       ctx.globalAlpha = 1;
       continue;
     }
