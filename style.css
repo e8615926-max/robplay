@@ -131,3 +131,42 @@ h2.sub { margin-top: 10px; font-size: 20px; }
 .bestiary td:first-child { white-space: nowrap; }
 .panel.wide { max-height: calc(100vh - 32px); overflow-y: auto; }
 #bossbar:not(.hidden) ~ #toast { top: 104px; }
+
+/* Меню */
+.menu-panel { width: min(440px, 100%); }
+.menu-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 4px; }
+.menu-badges .pill { font-weight: 700; font-size: 15px; }
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.menu-grid .btn { font-size: 15px; padding: 11px 8px; }
+.btn.big { font-size: 22px; padding: 14px; }
+.shop-btn { background: #8a4fd8; box-shadow: 0 4px 0 #5a2fa0; }
+.unlock-btn { background: #b8742a; box-shadow: 0 4px 0 #7a4a14; }
+.btn.danger { background: #b83a4a; box-shadow: 0 4px 0 #7a1f2b; }
+.logo { animation: logoFloat 3s ease-in-out infinite; }
+@keyframes logoFloat { 50% { transform: translateY(-5px) rotate(-1deg); } }
+.total { margin: 0; }
+
+/* Магазин */
+.shop-top { display: flex; gap: 16px; align-items: center; text-align: left; }
+#shop-preview { width: 180px; height: 150px; border-radius: 16px; background: radial-gradient(circle at 50% 70%, #2f3f86, #151d44); flex-shrink: 0; }
+.wallet { font-size: 28px; font-weight: 800; color: #ffd54a; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin: 8px 0; }
+.skin-card {
+  background: #22306a; border: 2px solid transparent; border-radius: 14px; padding: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; transition: transform .1s;
+}
+.skin-card:hover { transform: translateY(-2px); }
+.skin-card canvas { width: 72px; height: 72px; }
+.skin-card.owned { background: #24407a; }
+.skin-card.selected { border-color: #56e39f; box-shadow: 0 0 18px rgba(86,227,159,.35); }
+.skin-name { font-weight: 800; font-size: 14px; }
+.skin-card .btn { width: 100%; font-size: 13px; padding: 7px 4px; }
+.btn:disabled { opacity: .6; cursor: default; }
+
+/* Настройки */
+.setting { display: flex; flex-direction: column; gap: 6px; text-align: left; font-weight: 600; }
+.setting.check { flex-direction: row; align-items: center; gap: 10px; }
+.setting input[type=range] { width: 100%; accent-color: #6fd3ff; }
+.setting input[type=checkbox] { width: 20px; height: 20px; accent-color: #56e39f; }
+@media (max-width: 420px) { .shop-top { flex-direction: column; text-align: center; } }
+#toast { z-index: 50; }

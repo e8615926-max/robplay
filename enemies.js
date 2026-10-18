@@ -225,6 +225,9 @@ function killEnemy(e, p, stomped) {
   emit(e.x + e.w / 2, e.y + e.h / 2, 18, { color: [ENEMY_INFO[e.type].color, '#ffffff', '#333344'], speed: 260, life: 0.6 });
   Game.shake = Math.max(Game.shake, 6);
   Sound.play('stomp');
+  Game.level.bonus++;
+  Save.data.stats.kills++;
+  floatText(e.x + e.w / 2, e.y - 4, '+1 🪙');
   if (stomped) {
     p.vy = Input.is('jump') ? -STOMP_V * 1.25 : -STOMP_V;
     p.bounced = true; p.jumps = 1; p.canDash = true; p.sx = 0.8; p.sy = 1.2;

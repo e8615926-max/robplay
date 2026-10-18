@@ -218,6 +218,8 @@ function hitBoss(L, b) {
     L.bullets.length = 0;
     for (const e of L.enemies) if (e.alive) { e.alive = false; e.deadT = 0.6; }
     if (L.goal) L.goal.hidden = false;
+    Save.data.stats.bosses++;
+    floatText(b.x + b.w / 2, b.y - 10, '+50 🪙');
     Game.shake = 20;
     Sound.play('bossDie');
     UI.toast('<span class="t-title">Босс повержен!</span>Портал открыт — беги к финишу!', 3500);

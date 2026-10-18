@@ -31,17 +31,64 @@
 
   <!-- Главное меню -->
   <section id="screen-menu" class="screen">
-    <div class="panel">
+    <div class="panel menu-panel">
       <h1 class="logo">Rob<span>Play</span></h1>
       <p class="subtitle">Платформер о маленьком храбром роботе</p>
-      <button class="btn primary" data-action="continue">▶ Играть</button>
-      <button class="btn" data-action="levels">Выбор уровня</button>
-      <button class="btn" data-action="howto">Управление</button>
+      <div class="menu-badges"><span id="menu-wallet" class="pill"></span><span id="menu-total" class="pill"></span></div>
+      <button class="btn primary big" data-action="continue">▶ Играть</button>
+      <div class="menu-grid">
+        <button class="btn" data-action="levels">🗺 Уровни</button>
+        <button class="btn shop-btn" data-action="shop">🛒 Магазин</button>
+        <button class="btn" data-action="settings">⚙️ Настройки</button>
+        <button class="btn" data-action="stats">📊 Статистика</button>
+        <button class="btn" data-action="howto">🎮 Управление</button>
+        <button class="btn unlock-btn" data-action="unlock-all">🔓 Открыть все уровни</button>
+      </div>
       <div class="row">
         <button class="btn small" data-action="toggle-sound" id="btn-sound">🔊 Звук</button>
         <button class="btn small" data-action="toggle-music" id="btn-music">🎵 Музыка</button>
       </div>
-      <p class="total" id="menu-total"></p>
+    </div>
+  </section>
+
+  <!-- Магазин -->
+  <section id="screen-shop" class="screen hidden">
+    <div class="panel wide">
+      <h2>🛒 Магазин скинов</h2>
+      <div class="shop-top">
+        <canvas id="shop-preview" width="180" height="150"></canvas>
+        <div>
+          <div class="wallet">🪙 <b id="shop-wallet">0</b></div>
+          <p class="hint">Монеты копятся за прохождение уровней: собранные монеты, побеждённые враги, звёзды и боссы.</p>
+        </div>
+      </div>
+      <div id="shop-grid" class="shop-grid"></div>
+      <button class="btn" data-action="menu">← Назад</button>
+    </div>
+  </section>
+
+  <!-- Настройки -->
+  <section id="screen-settings" class="screen hidden">
+    <div class="panel">
+      <h2>⚙️ Настройки</h2>
+      <label class="setting">🔊 Громкость звуков <input type="range" id="set-sfx" min="0" max="100"></label>
+      <label class="setting">🎵 Громкость музыки <input type="range" id="set-music" min="0" max="100"></label>
+      <label class="setting check"><input type="checkbox" id="set-shake"> Тряска экрана</label>
+      <div class="row">
+        <button class="btn small" data-action="toggle-sound">🔊 Звук</button>
+        <button class="btn small" data-action="toggle-music">🎵 Музыка</button>
+      </div>
+      <button class="btn danger" data-action="reset">🗑 Сбросить прогресс</button>
+      <button class="btn" data-action="menu">← Назад</button>
+    </div>
+  </section>
+
+  <!-- Статистика -->
+  <section id="screen-stats" class="screen hidden">
+    <div class="panel">
+      <h2>📊 Статистика</h2>
+      <div class="stats" id="stats-list"></div>
+      <button class="btn" data-action="menu">← Назад</button>
     </div>
   </section>
 
@@ -131,6 +178,9 @@
   <script src="enemies.js"></script>
   <script src="boss.js"></script>
   <script src="fx.js"></script>
+  <script src="skins.js"></script>
+  <script src="decor.js"></script>
+  <script src="menu.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

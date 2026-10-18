@@ -54,11 +54,20 @@ function roundRect(ctx, x, y, w, h, r) {
 
 // ---------- Сохранение ----------
 const Save = {
-  data: { unlocked: 1, best: {}, muted: false, music: true },
+  data: {
+    unlocked: 1, best: {}, muted: false, music: true,
+    wallet: 0, skin: 'classic', skins: ['classic'], champion: false,
+    sfxVol: 1, musicVol: 1, shake: true,
+    stats: { coins: 0, deaths: 0, kills: 0, bosses: 0, time: 0, completed: 0 },
+  },
   load() {
     try {
       const d = JSON.parse(localStorage.getItem('robplay-save'));
-      if (d) Object.assign(this.data, d);
+      if (d) {
+        const stats = Object.assign({}, this.data.stats, d.stats);
+        Object.assign(this.data, d);
+        this.data.stats = stats;
+      }
     } catch (e) { /* хранилище недоступно */ }
   },
   store() {
@@ -88,7 +97,8 @@ const Sound = {
   apply() {
     if (!this.ctx) return;
     this.master.gain.value = Save.data.muted ? 0 : 1;
-    this.musicBus.gain.value = Save.data.music ? 0.11 : 0;
+    this.sfxBus.gain.value = 0.5 * Save.data.sfxVol;
+    this.musicBus.gain.value = Save.data.music ? 0.11 * Save.data.musicVol : 0;
   },
 
   tone(freq, dur, type = 'square', vol = 0.3, slideTo = 0, delay = 0, bus = this.sfxBus, at = 0) {
@@ -258,6 +268,7 @@ class Level {
     }
     if (this.boss && this.goal) this.goal.hidden = true;
     this.coinsTotal = this.coins.length;
+    this.bonus = 0;
     this.time = 0;
     this.deaths = 0;
     this.respawnPoint = { ...this.start };
@@ -296,6 +307,8 @@ const Game = {
   shake: 0,
   flash: 0,
   lightning: 0,
+  texts: [],
+  iris: 1,
   menuT: 0,
   timeScale: 1,
 };
@@ -326,7 +339,16 @@ function emit(x, y, n, opt = {}) {
     });
   }
 }
+function floatText(x, y, text, color = '#ffd54a') {
+  Game.texts.push({ x, y, text, color, life: 1 });
+}
 function updateParticles(dt) {
+  for (let i = Game.texts.length - 1; i >= 0; i--) {
+    const f = Game.texts[i];
+    f.life -= dt; f.y -= 40 * dt;
+    if (f.life <= 0) Game.texts.splice(i, 1);
+  }
+  Game.iris = Math.min(1, Game.iris + dt * 2.2);
   const ps = Game.particles;
   for (let i = ps.length - 1; i >= 0; i--) {
     const p = ps[i];
@@ -343,8 +365,10 @@ function startLevel(i) {
   Game.level = new Level(i);
   Game.player = makePlayer(Game.level.start.x, Game.level.start.y);
   Game.particles = [];
+  Game.texts = [];
   Game.shake = 0;
   Game.lightning = 0;
+  Game.iris = 0;
   snapCamera();
   Weather.init(Game.level);
   Sound.boss = !!LEVELS[i].boss;
@@ -368,6 +392,11 @@ function killPlayer() {
   p.dead = true;
   p.deadT = 0.9;
   Game.level.deaths++;
+  Save.data.stats.deaths++;
+  if (p.y > Game.level.h - 40 && LIQUID[Game.level.def.theme]) {
+    const col = LIQUID_COLORS[LIQUID[Game.level.def.theme]];
+    emit(p.x + p.w / 2, Game.level.h - 20, 24, { color: col, angle: -Math.PI / 2, spread: 0.9, speed: 380, life: 0.8 });
+  }
   Game.shake = 12;
   Game.flash = 0.35;
   emit(p.x + p.w / 2, p.y + p.h / 2, 34, { color: ['#6fd3ff', '#e8f6ff', '#ffd54a', '#5a6a9a'], speed: 420, size: 6, life: 1 });
@@ -388,6 +417,12 @@ function completeLevel() {
     stars: Math.max(prev ? prev.stars : 0, stars),
   };
   Save.data.unlocked = Math.max(Save.data.unlocked, Math.min(LEVELS.length, i + 2));
+  // монеты в копилку: собранные + бонус за врагов + за звёзды + за босса
+  const reward = L.coinsTaken + L.bonus + stars * 5 + (L.boss ? 50 : 0);
+  Save.data.wallet += reward;
+  const st = Save.data.stats;
+  st.coins += reward; st.completed++; st.time += L.time;
+  if (i === LEVELS.length - 1) Save.data.champion = true;
   Save.store();
   Sound.play('win');
   const g = L.goal;
@@ -396,7 +431,7 @@ function completeLevel() {
   }
   setState('complete');
   UI.hideToast();
-  UI.showComplete({ stars, allCoins, fast, newTime });
+  UI.showComplete({ stars, allCoins, fast, newTime, reward });
 }
 
 // ============================================================
@@ -583,6 +618,7 @@ function updatePlayer(p, dt) {
   }
   p.blinkT -= dt;
   if (p.blinkT < -0.12) p.blinkT = rand(1.5, 4);
+  skinTrail(p, dt);
 
   // Шипы
   const hb = { x: p.x + 3, y: p.y + 3, w: p.w - 6, h: p.h - 3 };
@@ -802,6 +838,12 @@ function drawTiles(L, cam, t) {
           ctx.fillStyle = th.top;
           ctx.fillRect(x + 4 + (tx % 3) * 6, y + 8, 4, 5);
           ctx.fillRect(x + 20 - (tx % 2) * 6, y + 8, 4, 4);
+          // травинки покачиваются на ветру
+          const sw = Math.sin(t * 2.2 + tx * 0.7) * 2.5;
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y); ctx.lineTo(x + 8 + sw, y - 6); ctx.lineTo(x + 10, y);
+          ctx.moveTo(x + 22, y); ctx.lineTo(x + 23.5 + sw, y - 4 - (tx % 3)); ctx.lineTo(x + 25, y);
+          ctx.fill();
         }
         if (L.tile(tx - 1, ty) !== '#') { ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y, 2, TILE); }
         if (L.tile(tx + 1, ty) !== '#') { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x + TILE - 3, y, 3, TILE); }
@@ -939,55 +981,16 @@ function drawGoal(L, t) {
   ctx.fillText('ФИНИШ', cx, g.y - 23.5);
 }
 
-function drawRobot(p, x, y, alpha = 1, ghost = false) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(x + p.w / 2, y + p.h);
-  ctx.scale(p.sx * p.face, p.sy);
-  const body = ghost ? '#ffd54a' : '#6fd3ff', dark = ghost ? '#c49a00' : '#2f87c4';
-  const moving = p.onGround && Math.abs(p.vx) > 20;
-  const sw = moving ? Math.sin(p.runPhase) : 0;
-  const air = !p.onGround;
-
-  // ноги
-  ctx.fillStyle = dark;
-  if (air) { ctx.fillRect(-8, -7, 5, 6); ctx.fillRect(3, -9, 5, 6); }
-  else { ctx.fillRect(-8 + sw * 3, -7, 5, 7); ctx.fillRect(3 - sw * 3, -7, 5, 7); }
-  // руки
-  ctx.fillStyle = dark;
-  const armY = air ? -24 : -18 + sw * 2;
-  ctx.fillRect(-14, armY, 4, 8);
-  ctx.fillRect(10, air ? -24 : -18 - sw * 2, 4, 8);
-  // тело
-  ctx.fillStyle = body;
-  roundRect(ctx, -11, -27, 22, 21, 6); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  roundRect(ctx, -9, -26, 12, 4, 2); ctx.fill();
-  // визор
-  ctx.fillStyle = '#16203f';
-  roundRect(ctx, -6, -23, 16, 10, 4); ctx.fill();
-  if (!ghost) {
-    const blink = p.blinkT < 0;
-    ctx.fillStyle = p.dead ? '#ff5d73' : '#8ff7ff';
-    if (blink) { ctx.fillRect(-2, -18, 4, 1.5); ctx.fillRect(4, -18, 4, 1.5); }
-    else { ctx.fillRect(-2, -21, 4, 6); ctx.fillRect(4, -21, 4, 6); }
-    // индикатор груди
-    ctx.fillStyle = dark; ctx.fillRect(-6, -11, 10, 3);
+function drawTexts() {
+  ctx.font = 'bold 14px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  for (const f of Game.texts) {
+    ctx.globalAlpha = Math.min(1, f.life * 2);
+    ctx.fillStyle = '#1b1b2a'; ctx.fillText(f.text, f.x + 1, f.y + 1);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
   }
-  // антенна
-  ctx.strokeStyle = dark; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(-2, -33); ctx.stroke();
-  const ready = p.canDash && p.dashCD <= 0;
-  ctx.fillStyle = ready ? '#ffd54a' : '#5a6380';
-  if (ready && !ghost) {
-    ctx.save(); ctx.globalAlpha = alpha * 0.35;
-    ctx.beginPath(); ctx.arc(-2, -35, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-  ctx.beginPath(); ctx.arc(-2, -35, 3, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
+  ctx.globalAlpha = 1;
 }
-
 function drawParticles() {
   for (const p of Game.particles) {
     ctx.globalAlpha = Math.max(0, p.life / p.max);
@@ -1000,11 +1003,12 @@ function drawParticles() {
 
 function render(t) {
   const L = Game.level;
-  if (!L) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0f1630'; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
+  if (Game.state === 'menu' || !L) { MenuScene.draw(); return; }
   const cam = { x: Game.cam.x, y: Game.cam.y };
-  if (Game.shake > 0.1) { cam.x += rand(-Game.shake, Game.shake); cam.y += rand(-Game.shake, Game.shake); }
+  if (Game.shake > 0.1 && Save.data.shake) { cam.x += rand(-Game.shake, Game.shake); cam.y += rand(-Game.shake, Game.shake); }
 
   drawBackground(L, cam, t);
+  drawDecor(L, cam, t);
   ctx.setTransform(scale, 0, 0, scale, -Math.round(cam.x * scale), -Math.round(cam.y * scale));
 
   // земля продолжается вниз за край уровня
@@ -1014,6 +1018,7 @@ function render(t) {
   }
   drawPlatforms(L);
   drawTiles(L, cam, t);
+  drawLiquid(L, cam, t);
   drawCheckpoints(L, t);
   drawGoal(L, t);
   drawCoins(L, t);
@@ -1027,6 +1032,7 @@ function render(t) {
     if (!p.dead && !(p.spawnT > 0 && Math.floor(p.spawnT * 20) % 2 === 0)) drawRobot(p, p.x, p.y);
   }
   drawParticles();
+  drawTexts();
 
   Weather.draw(t);
   if (L.dark) drawDarkness(L, cam, t);
@@ -1040,6 +1046,18 @@ function render(t) {
     ctx.fillStyle = `rgba(255,80,100,${Game.flash * 0.5})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+  // круглая шторка при старте уровня
+  if (Game.iris < 1 && p) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
+    const e = Game.iris * Game.iris;
+    const r = e * Math.hypot(canvas.width, canvas.height);
+    ctx.fillStyle = '#0b0f24';
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.arc(px, py, Math.max(1, r), 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+  }
 }
 
 // ============================================================
@@ -1051,7 +1069,107 @@ const UI = {
   last: {},
 
   show(name) {
-    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete']) $('screen-' + s).classList.toggle('hidden', s !== name);
+    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats']) {
+      $('screen-' + s).classList.toggle('hidden', s !== name);
+    }
+    this.shopOpen = name === 'shop';
+  },
+
+  // ---------- Магазин скинов ----------
+  shopOpen: false,
+  shopT: 0,
+  buildShop() {
+    $('shop-wallet').textContent = Save.data.wallet;
+    const grid = $('shop-grid');
+    grid.innerHTML = '';
+    for (const skin of SKINS) {
+      const owned = Save.data.skins.includes(skin.id) || (skin.req === 'final' && Save.data.champion);
+      const selected = Save.data.skin === skin.id;
+      const card = document.createElement('div');
+      card.className = 'skin-card' + (selected ? ' selected' : '') + (owned ? ' owned' : '');
+      const cv = document.createElement('canvas');
+      cv.width = 96; cv.height = 96;
+      const c = cv.getContext('2d');
+      c.scale(2, 2);
+      drawRobot(previewPose(1, false), 13, 12, 1, false, c, skin);
+      card.appendChild(cv);
+      const name = document.createElement('div');
+      name.className = 'skin-name';
+      name.textContent = skin.name;
+      card.appendChild(name);
+      const btn = document.createElement('button');
+      btn.className = 'btn small';
+      if (selected) { btn.textContent = '✔ Выбран'; btn.disabled = true; }
+      else if (owned) { btn.textContent = 'Выбрать'; btn.classList.add('primary'); }
+      else if (skin.req === 'final') { btn.textContent = '🔒 Пройди игру'; btn.disabled = true; }
+      else {
+        btn.textContent = `🪙 ${skin.price}`;
+        if (Save.data.wallet < skin.price) btn.classList.add('off');
+      }
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        Sound.init();
+        if (owned) {
+          Save.data.skin = skin.id; Save.store(); Sound.play('click');
+        } else if (Save.data.wallet >= skin.price) {
+          Save.data.wallet -= skin.price;
+          Save.data.skins.push(skin.id);
+          Save.data.skin = skin.id;
+          Save.store();
+          Sound.play('win');
+          this.toast(`<span class="t-title">Новый скин!</span>${skin.name} — теперь твой`, 2200);
+        } else {
+          Sound.play('death');
+          this.toast(`Не хватает монет: нужно ещё 🪙 ${skin.price - Save.data.wallet}`, 2000);
+          return;
+        }
+        this.buildShop();
+      });
+      card.appendChild(btn);
+      grid.appendChild(card);
+    }
+  },
+  animateShop(dt) {
+    if (!this.shopOpen) return;
+    this.shopT += dt;
+    const cv = $('shop-preview'), c = cv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.fillStyle = 'rgba(111,211,255,0.12)';
+    c.beginPath(); c.ellipse(cv.width / 2, cv.height - 18, 46, 8, 0, 0, Math.PI * 2); c.fill();
+    c.scale(3, 3);
+    const pose = previewPose(this.shopT, true);
+    const hop = Math.abs(Math.sin(this.shopT * 2.5)) * 8;
+    pose.onGround = hop < 1;
+    drawRobot(pose, cv.width / 6 - 11, cv.height / 3 - 34 - hop, 1, false, c);
+  },
+
+  // ---------- Статистика ----------
+  buildStats() {
+    const st = Save.data.stats;
+    let stars = 0, done = 0;
+    for (let i = 0; i < LEVELS.length; i++) if (Save.data.best[i]) { stars += Save.data.best[i].stars; done++; }
+    const h = Math.floor(st.time / 3600), m = Math.floor(st.time / 60) % 60;
+    const rows = [
+      ['🪙 В копилке', Save.data.wallet],
+      ['💰 Всего заработано', st.coins],
+      ['⭐ Звёзд', `${stars} / ${LEVELS.length * 3}`],
+      ['🏁 Уровней пройдено', `${done} / ${LEVELS.length}`],
+      ['🔁 Всего прохождений', st.completed],
+      ['👾 Врагов побеждено', st.kills],
+      ['👑 Боссов побеждено', st.bosses],
+      ['💀 Падений', st.deaths],
+      ['⏱ Время в игре', h ? `${h} ч ${m} мин` : `${m} мин`],
+      ['🎨 Скинов', `${Save.data.skins.length + (Save.data.champion && !Save.data.skins.includes('champion') ? 1 : 0)} / ${SKINS.length}`],
+    ];
+    $('stats-list').innerHTML = rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
+  },
+
+  // ---------- Настройки ----------
+  buildSettings() {
+    $('set-sfx').value = Math.round(Save.data.sfxVol * 100);
+    $('set-music').value = Math.round(Save.data.musicVol * 100);
+    $('set-shake').checked = !!Save.data.shake;
   },
 
   toast(html, ms) {
@@ -1098,6 +1216,7 @@ const UI = {
     let stars = 0;
     for (let i = 0; i < LEVELS.length; i++) stars += Save.data.best[i] ? Save.data.best[i].stars : 0;
     $('menu-total').textContent = `⭐ ${stars} / ${LEVELS.length * 3}`;
+    $('menu-wallet').textContent = `🪙 ${Save.data.wallet}`;
   },
 
   buildLevels() {
@@ -1137,7 +1256,8 @@ const UI = {
       <span>Рекорд</span><b>${fmtTime(best.time)} с</b>
       <span>Монеты</span><b>${L.coinsTaken}/${L.coinsTotal} ${r.allCoins ? '✔' : ''}</b>
       <span>Цель по времени</span><b>${L.def.par} с ${r.fast ? '✔' : ''}</b>
-      <span>Падения</span><b>${L.deaths}</b>`;
+      <span>Падения</span><b>${L.deaths}</b>
+      <span>Награда</span><b class="new">+${r.reward} 🪙</b>`;
     $('btn-next').classList.toggle('hidden', last);
     setTimeout(() => this.show('complete'), 700);
   },
@@ -1160,13 +1280,9 @@ function pause() { if (Game.state === 'playing') { setState('paused'); UI.show('
 function resume() { if (Game.state === 'paused') setState('playing'); }
 
 function goMenu() {
-  if (!Game.level || Game.state === 'playing' || Game.state === 'paused' || Game.state === 'complete') {
-    // фон меню — случайный открытый уровень
-    const n = Math.min(Save.data.unlocked, LEVELS.length);
-    Game.level = new Level(Math.floor(Math.random() * n));
-    Game.menuT = 0;
-    Weather.init(Game.level);
-  }
+  Game.level = null;
+  Game.particles = [];
+  MenuScene.reset();
   Sound.boss = false;
   UI.updateBoss(null);
   Game.player = null;
@@ -1180,9 +1296,28 @@ function handleAction(a) {
   Sound.init();
   Sound.play('click');
   switch (a) {
-    case 'continue': startLevel(Math.min(Save.data.unlocked, LEVELS.length) - 1); break;
+    case 'continue': {
+      // первый непройденный открытый уровень
+      let i = 0;
+      while (i < LEVELS.length - 1 && Save.data.best[i] && i + 1 < Save.data.unlocked) i++;
+      startLevel(i);
+      break;
+    }
     case 'levels': UI.buildLevels(); if (Game.state === 'paused' || Game.state === 'complete') goMenu(); UI.show('levels'); break;
     case 'howto': UI.show('howto'); break;
+    case 'shop': UI.buildShop(); UI.show('shop'); break;
+    case 'stats': UI.buildStats(); UI.show('stats'); break;
+    case 'settings': UI.buildSettings(); UI.show('settings'); break;
+    case 'unlock-all':
+      Save.data.unlocked = LEVELS.length; Save.store();
+      UI.toast('<span class="t-title">🔓 Все уровни открыты!</span>Выбирай любой уровень в меню «Уровни»', 2600);
+      break;
+    case 'reset':
+      if (confirm('Сбросить весь прогресс, монеты и скины?')) {
+        try { localStorage.removeItem('robplay-save'); } catch (e) { /* ignore */ }
+        location.reload();
+      }
+      break;
     case 'menu': goMenu(); break;
     case 'resume': resume(); break;
     case 'restart': startLevel(Game.level.index); break;
@@ -1198,6 +1333,10 @@ document.addEventListener('click', e => {
   if (b) handleAction(b.dataset.action);
 });
 $('btn-pause').addEventListener('click', () => { Sound.init(); pause(); });
+$('set-sfx').addEventListener('input', e => { Save.data.sfxVol = e.target.value / 100; Save.store(); Sound.init(); Sound.apply(); });
+$('set-sfx').addEventListener('change', () => Sound.play('coin'));
+$('set-music').addEventListener('input', e => { Save.data.musicVol = e.target.value / 100; Save.store(); Sound.init(); Sound.apply(); });
+$('set-shake').addEventListener('change', e => { Save.data.shake = e.target.checked; Save.store(); });
 
 window.addEventListener('keydown', e => {
   const a = KEYMAP[e.code];
@@ -1241,7 +1380,6 @@ window.addEventListener('resize', resize);
 
 // ---------- Главный цикл ----------
 let lastT = performance.now(), acc = 0, padPauseHeld = false;
-const MENU_DUMMY = { x: -9999, y: -9999, w: 1, h: 1, face: 1, dead: true };
 function frame(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
@@ -1265,19 +1403,9 @@ function frame(now) {
   } else {
     acc = 0;
     updateParticles(dt);
-    if (Game.state === 'menu' && Game.level) {
-      // Плавный пролёт камеры над уровнем в меню
-      Game.menuT += dt;
-      const L = Game.level;
-      const span = Math.max(0, L.w - viewW);
-      Game.cam.x = span * (0.5 - 0.5 * Math.cos(Game.menuT * 0.05));
-      Game.cam.y = L.h <= viewH ? L.h - viewH : L.h - viewH;
-      L.time += dt;
-      for (const pl of L.platforms) {
-        const s = Math.sin(L.time * pl.speed + pl.phase) * pl.range;
-        if (pl.axis === 'x') pl.x = pl.x0 + s; else pl.y = pl.y0 + s;
-      }
-      updateEnemies(L, MENU_DUMMY, dt);
+    if (Game.state === 'menu') {
+      MenuScene.update(dt);
+      UI.animateShop(dt);
     }
   }
   if (Game.level && Game.state !== 'paused') Weather.update(dt, Game.cam);
