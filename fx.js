@@ -6,7 +6,7 @@
 // ============================================================
 const FX_COUNT = {
   rain: 170, snow: 120, leaves: 26, petals: 30, fireflies: 34, sand: 40,
-  sandstorm: 150, bubbles: 40, embers: 0, sparks: 34, space: 4,
+  sandstorm: 150, bubbles: 40, embers: 0, sparks: 34, space: 4, feathers: 30, digital: 70,
 };
 
 const Weather = {
@@ -32,6 +32,8 @@ const Weather = {
       case 'sandstorm': f.vx = rand(420, 680); f.vy = rand(-20, 40); if (!anywhere) { f.x = -20; f.y = rand(0, viewH); } break;
       case 'bubbles': if (!anywhere) f.y = viewH + 10; f.vy = -rand(30, 70); break;
       case 'sparks': f.vx = rand(-40, 40); f.vy = rand(60, 200); f.y = anywhere ? f.y : -10; break;
+      case 'feathers': f.vx = rand(-30, 30); f.vy = rand(15, 35); break;
+      case 'digital': f.vx = 0; f.vy = rand(120, 280); f.ch = '01<>{}#$/'[Math.floor(rand(0, 9))]; f.x = Math.round(f.x / 14) * 14; break;
       case 'space': f.x = rand(0, viewW); f.y = rand(-viewH, 0); f.vx = rand(500, 700); f.vy = rand(220, 320); f.wait = rand(0, 4); break;
     }
     return f;
@@ -57,7 +59,8 @@ const Weather = {
         f.y += Math.cos(f.t * 0.9 + f.rot) * 14 * dt - dcy * f.s;
       } else {
         let vx = f.vx;
-        if (this.kind === 'leaves' || this.kind === 'petals' || this.kind === 'snow') vx += Math.sin(f.t * 1.5 + f.rot) * 30;
+        if (this.kind === 'leaves' || this.kind === 'petals' || this.kind === 'snow' || this.kind === 'feathers') vx += Math.sin(f.t * 1.5 + f.rot) * 30;
+        if (this.kind === 'digital' && Math.random() < dt * 4) f.ch = '01<>{}#$/'[Math.floor(rand(0, 9))];
         if (this.kind === 'bubbles') vx += Math.sin(f.t * 2 + f.rot) * 12;
         f.x += vx * dt * f.s - dcx * f.s;
         f.y += f.vy * dt * f.s - dcy * f.s;
@@ -132,6 +135,25 @@ const Weather = {
         for (let i = 0; i < 4; i++) {
           const x = ((i * 260 + t * 12) % (viewW + 300)) - 150;
           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 70, 0); ctx.lineTo(x + 170, viewH); ctx.lineTo(x + 60, viewH); ctx.fill();
+        }
+        break;
+      case 'feathers':
+        for (const f of this.list) {
+          ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(Math.sin(f.t * 2 + f.rot) * 0.8);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.beginPath(); ctx.ellipse(0, 0, 2.5 * f.s + 1, 7 * f.s + 2, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(200,200,220,0.8)'; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.moveTo(0, -7 * f.s - 2); ctx.lineTo(0, 7 * f.s + 4); ctx.stroke();
+          ctx.restore();
+        }
+        break;
+      case 'digital':
+        ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
+        for (const f of this.list) {
+          ctx.fillStyle = `rgba(0,255,200,${0.25 + f.s * 0.4})`;
+          ctx.fillText(f.ch, f.x, f.y);
+          ctx.fillStyle = `rgba(0,255,200,${0.12 * f.s})`;
+          ctx.fillText(f.ch === '0' ? '1' : '0', f.x, f.y - 14);
         }
         break;
       case 'sparks':

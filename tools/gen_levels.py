@@ -101,7 +101,7 @@ l.coins([(118,9),(125,7),(132,9)])
 l.ground(138,152); l.put(140,8,'F'); l.put(147,11,'G')
 l.put(75, 11, '*')
 levels.append(dict(name='Рывок',par=55,theme=4,
-  tip='Shift / X — рывок! Он пробивает врагов. Антенна светится жёлтым, когда рывок готов.',map=l.out()))
+  tip='Shift / X — твоя способность (по умолчанию рывок). Антенна светится жёлтым, когда она готова.',map=l.out()))
 # ---- 6 (tall finale)
 H=20
 l=L(182,H)
@@ -171,6 +171,7 @@ class Gen:
         if s.rng.random() < 0.15: s.p(x + 1, 11)
         s.e(x + w - 3)
         if s.diff >= 2: s.e(x + w // 2)
+        if s.num > 30: s.e(x + 3)
         if s.diff >= 2 and s.rng.random() < 0.6:
             s.l.row(x + 5, 8, '=', 4); s.l.coins([(x + 6, 7), (x + 7, 7)])
             s.a(x + 8, 5)
@@ -328,16 +329,24 @@ def boss_arena(kind):
     elif kind == 2:
         l.put(5, 11, 'B'); l.put(32, 11, 'B'); l.row(12, 7, '=', 4); l.row(22, 7, '=', 4)
         l.coins([(13, 6), (23, 6)])
-    else:
+    elif kind == 3:
         l.row(5, 8, '=', 4); l.row(16, 6, '=', 6); l.row(29, 8, '=', 4)
         l.coins([(6, 7), (18, 5), (30, 7)])
+    elif kind == 4:
+        l.put(3, 11, 'B'); l.put(34, 11, 'B')
+        l.row(6, 8, '=', 4); l.row(28, 8, '=', 4); l.row(16, 6, '=', 6)
+        l.coins([(7, 7), (29, 7), (18, 5), (19, 5)])
+    else:
+        l.row(5, 9, '=', 4); l.row(29, 9, '=', 4); l.row(15, 6, '=', 8)
+        l.put(11, 11, '!')
+        l.coins([(6, 8), (30, 8), (17, 5), (20, 5)])
     return l.out()
 
 
 NEW = [
     # номер, название, подсказка, тема, сложность, кусков, модификаторы
     (7, 'Прыгучий лес', 'Новый враг: лягушка-прыгун! Она скачет к тебе — растопчи её сверху.', 0, 1, 9, {}),
-    (8, 'Ливень', 'Ежи-колючки не боятся прыжков на голову — их берёт только рывок. Турели стреляют: прыгай через снаряды!', 6, 1, 10, {}),
+    (8, 'Ливень', 'Ежи-колючки не боятся прыжков на голову — их берёт только способность. Турели стреляют: прыгай через снаряды!', 6, 1, 10, {}),
     (9, 'Тёмные пещеры', 'Здесь темно! Летучие мыши пикируют сверху, когда ты проходишь под ними.', 2, 1, 10, {'dark': True}),
     (10, 'БОСС: Громобот', 'Прыгай Громоботу на голову! Перепрыгивай ударные волны, когда он приземляется.', 10, 0, 0, {'boss': 1}),
     (11, 'Ледяной перевал', 'Лёд скользкий — разгоняйся и тормози заранее. Новые враги: таран бросается в атаку, а улитку можно растоптать и пнуть её панцирь!', 7, 2, 10, {'ice': True}),
@@ -347,7 +356,7 @@ NEW = [
     (15, 'Грозовые пики', 'Циркулярные пилы неуязвимы — просто держись подальше.', 6, 2, 12, {}),
     (16, 'Глубины', 'Под водой всё легче: прыжки выше и падение медленнее.', 9, 2, 12, {'lowGrav': True}),
     (17, 'Конфетные облака', 'Сладкое, но опасное небо. Гренадёры кидают бомбы по дуге!', 3, 2, 12, {}),
-    (18, 'Дом с привидениями', 'Призраки крадутся, только когда ты стоишь к ним спиной! Рывок развеивает их.', 2, 2, 12, {'dark': True}),
+    (18, 'Дом с привидениями', 'Призраки крадутся, только когда ты стоишь к ним спиной! Способности развеивают их.', 2, 2, 12, {'dark': True}),
     (19, 'Звёздная ночь', 'Последний рубеж перед вторым боссом. Ракетницы пускают самонаводящиеся ракеты — их можно растоптать!', 4, 2, 13, {}),
     (20, 'БОСС: Буревестник', 'Туча кидает бомбы. Когда она рухнет на землю и оглохнет — прыгай ей на голову!', 6, 0, 0, {'boss': 2}),
     (21, 'Старый завод', 'Свет погас, искры летят...', 10, 3, 12, {'dark': True}),
@@ -359,8 +368,81 @@ NEW = [
     (27, 'Буря в пустыне', 'Песок застилает всё вокруг.', 8, 3, 14, {}),
     (28, 'Бездна', 'Кромешная тьма и призраки.', 2, 3, 14, {'dark': True}),
     (29, 'Сердце вулкана', 'Последний шаг до Ядра Хаоса.', 5, 3, 15, {}),
-    (30, 'ФИНАЛ: Ядро Хаоса', 'Ядро защищено щитом. Когда оно устанет и опустится — бей прыжком или рывком!', 11, 0, 0, {'boss': 3}),
+    (30, 'БОСС: Ядро Хаоса', 'Ядро защищено щитом. Когда оно устанет и опустится — бей прыжком или способностью!', 11, 0, 0, {'boss': 3}),
+    (31, 'Облачные острова', 'Мир 4: Небесные острова. Пружины и платформы унесут тебя под самые облака!', 12, 3, 14, {}),
+    (32, 'Ветряные мельницы', 'Высоко и ветрено. Не смотри вниз!', 12, 3, 14, {}),
+    (33, 'Золотые шпили', 'Стражи небесной крепости не дремлют.', 12, 3, 15, {}),
+    (34, 'Звёздный мост', 'Здесь почти нет гравитации — прыгай смело.', 12, 3, 15, {'lowGrav': True}),
+    (35, 'Радужная дорога', 'Сладкий путь между облаками.', 3, 3, 15, {}),
+    (36, 'Небесная крепость', 'Крепость полна ловушек.', 12, 3, 16, {}),
+    (37, 'Грозовой фронт', 'Молнии сверкают совсем рядом.', 6, 3, 16, {}),
+    (38, 'Ледяные облака', 'Облака замёрзли — держи равновесие!', 12, 3, 16, {'ice': True}),
+    (39, 'Врата дракона', 'Впереди логово Механического Змея.', 12, 3, 17, {}),
+    (40, 'БОСС: Механический Змей', 'Змей неуязвим, пока летает. Когда он рухнет и оглушённо ляжет — прыгай на голову! Тело сверху безопасно.', 12, 0, 0, {'boss': 4}),
+    (41, 'Вход в Сеть', 'Мир 5: Кибер-мир. Ты внутри компьютера!', 13, 3, 15, {}),
+    (42, 'Поток данных', 'Данные несутся со скоростью света.', 13, 3, 15, {}),
+    (43, 'Брандмауэр', 'Система отключила свет. Будь осторожен.', 13, 3, 16, {'dark': True}),
+    (44, 'Глюк', 'Пол стал скользким от ошибок.', 13, 3, 16, {'ice': True}),
+    (45, 'Лабиринт кода', 'Вирусы повсюду.', 13, 3, 16, {}),
+    (46, 'Нулевая гравитация', 'Сектор без гравитации.', 13, 3, 16, {'lowGrav': True}),
+    (47, 'Вирусная зона', 'Самые опасные программы собрались здесь.', 13, 3, 17, {}),
+    (48, 'Ядро сервера', 'Тьма и шум вентиляторов.', 13, 3, 17, {'dark': True}),
+    (49, 'Последний байт', 'Остался один шаг до Омеги.', 13, 3, 18, {}),
+    (50, 'ФИНАЛ: Омега', 'Омега стреляет лазерами — следи за красной линией и уходи с неё! Бей, когда Омега устанет.', 13, 0, 0, {'boss': 5}),
 ]
+
+EN = {
+    1: ('First Steps', '← → or A D — run, Space / W — jump. You can jump again in mid-air!'),
+    2: ('Spikes and Cliffs', 'Watch out for spikes! Cracked blocks crumble under your feet — keep moving. ↓ — drop through thin platforms.'),
+    3: ('Wall Jumps', 'Press against a wall in mid-air to slide. Press jump to kick off and climb higher!'),
+    4: ('Springs and Lifts', 'Jump on a spring to fly high. You can stomp flying enemies too!'),
+    5: ('Dash', 'Shift / X — your ability (dash by default). The antenna glows yellow when it is ready.'),
+    6: ('Final Run', 'Everything you have learned in one level. Good luck, robot!'),
+    7: ('Bouncy Forest', 'New enemy: the jumping frog! It hops towards you — stomp it.'),
+    8: ('Downpour', 'Spiky hedgehogs ignore stomps — only an ability defeats them. Turrets shoot: jump over the shots!'),
+    9: ('Dark Caves', 'It is dark here! Bats dive at you when you walk below them.'),
+    10: ('BOSS: Thunderbot', 'Jump on Thunderbot\'s head! Jump over the shockwaves when he lands.'),
+    11: ('Icy Pass', 'Ice is slippery — speed up and brake early. New: the ram charges when it sees you, and snails hide in shells you can kick!'),
+    12: ('Snowstorm', 'Snow blinds you. Slimes split into two little ones when stomped!'),
+    13: ('Sandstorm', 'Stone crushers fall from above — run under them quickly! You can jump on top of them.'),
+    14: ('Desert Mirages', 'Hot sands. Spiders drop down on threads — pass when they are up.'),
+    15: ('Thunder Peaks', 'Saw blades cannot be destroyed — keep away from them.'),
+    16: ('The Deep', 'Everything is lighter underwater: higher jumps and slower falls.'),
+    17: ('Candy Clouds', 'Sweet but dangerous sky. Grenadiers throw bombs in an arc!'),
+    18: ('Haunted House', 'Ghosts sneak up only when your back is turned! Abilities scatter them.'),
+    19: ('Starry Night', 'The last stretch before the second boss. Rocket launchers fire homing rockets — you can stomp them!'),
+    20: ('BOSS: Stormbird', 'The cloud drops bombs. When it crashes down and is stunned — jump on its head!'),
+    21: ('Old Factory', 'The lights are out and sparks are flying...'),
+    22: ('Outer Space', 'Zero gravity! Very high jumps.'),
+    23: ('Lava Rivers', 'It is hot! Everything is against you.'),
+    24: ('Glacier', 'Slippery and dangerous.'),
+    25: ('Sunken City', 'Deep underwater.'),
+    26: ('Conveyor', 'The factory is running at full power.'),
+    27: ('Desert Storm', 'Sand covers everything.'),
+    28: ('The Abyss', 'Pitch darkness and ghosts.'),
+    29: ('Heart of the Volcano', 'One step from the Chaos Core.'),
+    30: ('BOSS: Chaos Core', 'The Core has a shield. When it gets tired and sinks down — hit it with a jump or your ability!'),
+    31: ('Cloud Islands', 'World 4: Sky Islands. Springs and platforms will carry you up to the clouds!'),
+    32: ('Windmills', 'High and windy. Do not look down!'),
+    33: ('Golden Spires', 'The guards of the sky fortress never sleep.'),
+    34: ('Star Bridge', 'There is almost no gravity here — jump boldly.'),
+    35: ('Rainbow Road', 'A sweet path between the clouds.'),
+    36: ('Sky Fortress', 'The fortress is full of traps.'),
+    37: ('Storm Front', 'Lightning strikes very close.'),
+    38: ('Frozen Clouds', 'The clouds have frozen — keep your balance!'),
+    39: ('Dragon Gate', 'The Mecha Serpent\'s lair lies ahead.'),
+    40: ('BOSS: Mecha Serpent', 'The Serpent is invulnerable while flying. When it crashes and lies stunned — jump on its head! Its body is safe from above.'),
+    41: ('Network Entry', 'World 5: Cyber World. You are inside a computer!'),
+    42: ('Data Stream', 'Data rushes by at the speed of light.'),
+    43: ('Firewall', 'The system turned off the lights. Be careful.'),
+    44: ('Glitch', 'The floor became slippery with errors.'),
+    45: ('Code Maze', 'Viruses everywhere.'),
+    46: ('Zero-G Sector', 'A sector without gravity.'),
+    47: ('Virus Zone', 'The most dangerous programs gathered here.'),
+    48: ('Server Core', 'Darkness and the hum of fans.'),
+    49: ('Last Byte', 'One step left to Omega.'),
+    50: ('FINAL: Omega', 'Omega fires lasers — watch the red line and get off it! Strike when Omega is tired.'),
+}
 # Нумерация лиги: уровни 1–6 сделаны вручную выше
 for num, name, tip, theme, diff, chunks, mods in NEW:
     if mods.get('boss'):
@@ -371,6 +453,9 @@ for num, name, tip, theme, diff, chunks, mods in NEW:
     lv = dict(name=name, par=par, theme=theme, tip=tip, map=m)
     lv.update(mods)
     levels.append(lv)
+
+for i, lv in enumerate(levels):
+    lv['name_en'], lv['tip_en'] = EN[i + 1]
 
 with open('levels.js', 'w') as f:
     f.write('// Карты уровней (сгенерировано tools/gen_levels.py). Символы:\n')
@@ -383,7 +468,7 @@ with open('levels.js', 'w') as f:
     f.write('const LEVELS = [\n')
     for lv in levels:
         f.write('  {\n')
-        for k in ('name', 'tip', 'par', 'theme', 'ice', 'lowGrav', 'dark', 'boss'):
+        for k in ('name', 'name_en', 'tip', 'tip_en', 'par', 'theme', 'ice', 'lowGrav', 'dark', 'boss'):
             if k in lv:
                 f.write(f'    {k}: {json.dumps(lv[k], ensure_ascii=False)},\n')
         f.write('    map: [\n')

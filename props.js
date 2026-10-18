@@ -17,6 +17,8 @@ const PROP_KINDS = {
   9: ['coral', 'shell', 'coral', 'starfish'],
   10: ['barrel', 'cone', 'vent'],
   11: ['alien', 'crystal', 'alien'],
+  12: ['flower', 'bush', 'statue', 'flower'],
+  13: ['node', 'crystal', 'antenna'],
 };
 
 function buildProps(L) {
@@ -176,6 +178,24 @@ function drawProps(L, cam, t) {
         ctx.fillStyle = '#ff8a3d';
         ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(0, -12); ctx.lineTo(5, 0); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.fillRect(-2.5, -7, 5, 2);
+        break;
+      case 'statue':
+        ctx.fillStyle = '#f0d9a0'; ctx.fillRect(-4, -6, 8, 6);
+        ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(0, -11, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,240,180,${0.3 + 0.3 * Math.sin(t * 3 + pr.seed)})`; ctx.beginPath(); ctx.arc(0, -11, 9, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'node': {
+        const a = 0.5 + 0.5 * Math.sin(t * 5 + pr.seed);
+        ctx.fillStyle = '#0b2a3a'; ctx.fillRect(-6, -8, 12, 8);
+        ctx.fillStyle = `rgba(0,255,200,${a})`; ctx.fillRect(-4, -6, 2, 2); ctx.fillRect(0, -6, 2, 2);
+        ctx.fillStyle = `rgba(255,60,200,${1 - a})`; ctx.fillRect(3, -6, 2, 2);
+        break;
+      }
+      case 'antenna':
+        ctx.strokeStyle = '#3a5a6a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -16); ctx.stroke();
+        ctx.fillStyle = Math.sin(t * 6 + pr.seed) > 0 ? '#00ffc8' : '#004a40';
+        ctx.beginPath(); ctx.arc(0, -17, 2.5, 0, Math.PI * 2); ctx.fill();
         break;
       case 'alien': {
         ctx.rotate(sway * 1.5);

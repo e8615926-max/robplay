@@ -318,11 +318,11 @@ function killEnemy(e, p, stomped) {
   Sound.play('stomp');
   Game.level.bonus++;
   Save.data.stats.kills++;
-  floatText(e.x + e.w / 2, e.y - 4, '+1 🪙');
+  floatText(e.x + e.w / 2, e.y - 4, '+1', '#ffd54a', 'coin');
   if (!p) return;
   if (stomped) {
     p.vy = Input.is('jump') ? -STOMP_V * 1.25 : -STOMP_V;
-    p.bounced = true; p.jumps = 1; p.canDash = true; p.sx = 0.8; p.sy = 1.2;
+    p.bounced = true; p.jumps = airJumps(); refillAbility(p); p.sx = 0.8; p.sy = 1.2;
   }
 }
 
@@ -337,6 +337,7 @@ function enemyContact(L, p, dt) {
     if (!overlap(p, eb)) continue;
     const fromAbove = p.vy > 0 && (p.y + p.h) - p.vy * dt <= e.y + 10;
     if (p.star > 0) { killEnemy(e, p, false); continue; }
+    if (p.pound && fromAbove && info.dash) { p.pound = false; killEnemy(e, p, true); continue; }
     if (e.type === 'snail' && p.dashT <= 0) {
       if (snailContact(L, e, p, fromAbove)) return true;
       continue;
@@ -350,7 +351,7 @@ function enemyContact(L, p, dt) {
       // давилка опасна только снизу и в падении
       if (e.state === 'fall' || p.y > e.y + e.h - 10) { if (p.spawnT <= 0) { killPlayer(); return true; } }
       else if (fromAbove || p.y + p.h <= e.y + 10) {
-        p.y = e.y - p.h; p.vy = -STOMP_V * 0.7; p.bounced = true; p.jumps = 1; p.canDash = true;
+        p.y = e.y - p.h; p.vy = -STOMP_V * 0.7; p.bounced = true; p.jumps = airJumps(); refillAbility(p);
       }
     } else if (p.spawnT <= 0) {
       killPlayer();
@@ -362,7 +363,7 @@ function enemyContact(L, p, dt) {
 
 function bounceOff(p, k = 1) {
   p.vy = (Input.is('jump') ? -STOMP_V * 1.25 : -STOMP_V) * k;
-  p.bounced = true; p.jumps = 1; p.canDash = true; p.sx = 0.8; p.sy = 1.2;
+  p.bounced = true; p.jumps = airJumps(); refillAbility(p); p.sx = 0.8; p.sy = 1.2;
 }
 
 // Улитка: растоптал — панцирь, коснулся панциря — пнул, скользящий панцирь опасен сбоку
@@ -423,6 +424,14 @@ function updateBullets(L, p, dt) {
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     let dead = b.life <= 0 || b.y > L.h + 100;
+    if (b.kind === 'laser') {
+      // предупреждение, затем луч на всю арену
+      const active = 1.4 - b.life >= b.warn;
+      if (active && !b.fired) { b.fired = true; Sound.play('laserFire'); Game.shake = Math.max(Game.shake, 5); }
+      if (active && !p.dead && p.spawnT <= 0 && Math.abs(p.y + p.h / 2 - b.y) < p.h / 2 + 5) killPlayer();
+      if (dead) L.bullets.splice(i, 1);
+      continue;
+    }
     if (b.kind === 'wave') {
       const tx = Math.floor((b.x + (b.vx > 0 ? b.w : 0)) / TILE), ty = Math.floor((b.y + b.h - 2) / TILE);
       if (L.solid(tx, ty) || !L.solid(tx, ty + 1)) dead = true;
@@ -433,7 +442,7 @@ function updateBullets(L, p, dt) {
         const cx = clamp(b.x, p.x + 2, p.x + p.w - 2), cy = clamp(b.y, p.y + 2, p.y + p.h);
         if ((b.x - cx) ** 2 + (b.y - cy) ** 2 < (b.r + 2) ** 2) {
           if ((b.kind === 'rocket' && p.vy > 0 && p.y + p.h - p.vy * dt <= b.y + 4) || p.star > 0) {
-            bounceOff(p); dead = true; Sound.play('stomp'); Game.level.bonus++; floatText(b.x, b.y - 8, '+1 🪙');
+            bounceOff(p); dead = true; Sound.play('stomp'); Game.level.bonus++; floatText(b.x, b.y - 8, '+1', '#ffd54a', 'coin');
           } else if (p.spawnT <= 0) { killPlayer(); dead = true; }
         }
       }
@@ -452,6 +461,23 @@ function updateBullets(L, p, dt) {
 
 function drawBullets(L, t) {
   for (const b of L.bullets) {
+    if (b.kind === 'laser') {
+      const el = 1.4 - b.life;
+      if (el < b.warn) {
+        ctx.globalAlpha = 0.35 + 0.4 * Math.abs(Math.sin(el * 18));
+        ctx.strokeStyle = '#ff3b5c'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]);
+        ctx.beginPath(); ctx.moveTo(0, b.y); ctx.lineTo(L.w, b.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      } else {
+        const k = Math.min(1, b.life / 0.15);
+        ctx.globalAlpha = k;
+        ctx.fillStyle = 'rgba(255,60,92,0.35)'; ctx.fillRect(0, b.y - 14, L.w, 28);
+        ctx.fillStyle = '#ff3b5c'; ctx.fillRect(0, b.y - 6, L.w, 12);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, b.y - 2, L.w, 4);
+        ctx.globalAlpha = 1;
+      }
+      continue;
+    }
     if (b.kind === 'wave') {
       const g = ctx.createLinearGradient(0, b.y, 0, b.y + b.h);
       g.addColorStop(0, 'rgba(255,240,150,0)');

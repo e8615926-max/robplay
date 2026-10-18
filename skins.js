@@ -5,21 +5,21 @@
 // ============================================================
 // acc — аксессуар, trail — след при беге, req — условие открытия
 const SKINS = [
-  { id: 'classic', name: 'Классик', price: 0, body: '#6fd3ff', dark: '#2f87c4', eye: '#8ff7ff' },
-  { id: 'mint', name: 'Мятный', price: 40, body: '#7af0c1', dark: '#2aa77a', eye: '#e9fff6' },
-  { id: 'sunny', name: 'Солнечный', price: 60, body: '#ffd54a', dark: '#c49a00', eye: '#fff6c2' },
-  { id: 'rose', name: 'Розочка', price: 90, body: '#ff9fcf', dark: '#c04f95', eye: '#ffe0f2', acc: 'bow' },
-  { id: 'cowboy', name: 'Ковбой', price: 120, body: '#d9a066', dark: '#8f5a2b', eye: '#8ff7ff', acc: 'hat' },
-  { id: 'ninja', name: 'Ниндзя', price: 150, body: '#3a3f55', dark: '#1b1e2b', eye: '#ff3b3b', acc: 'band', trail: 'smoke' },
-  { id: 'dj', name: 'Диджей', price: 200, body: '#56e39f', dark: '#1f8a58', eye: '#ffffff', acc: 'phones', trail: 'notes' },
-  { id: 'king', name: 'Король', price: 260, body: '#b48cff', dark: '#6b3fc4', eye: '#ffffff', acc: 'crown', trail: 'sparkle' },
-  { id: 'devil', name: 'Чертёнок', price: 320, body: '#ff5d5d', dark: '#9a1f1f', eye: '#ffd54a', acc: 'horns', trail: 'fire' },
-  { id: 'angel', name: 'Ангел', price: 320, body: '#ffffff', dark: '#b8c4e0', eye: '#6fd3ff', acc: 'halo', trail: 'sparkle' },
-  { id: 'ghost', name: 'Призрак', price: 400, body: '#e8f0ff', dark: '#9aa8c8', eye: '#1b1b2a', alpha: 0.72, trail: 'ghost' },
-  { id: 'magma', name: 'Магма', price: 550, body: '#ff6a3d', dark: '#5a1a0a', eye: '#ffd54a', glow: '#ff8a3d', trail: 'fire' },
-  { id: 'gold', name: 'Золотой', price: 700, body: '#ffd700', dark: '#b8860b', eye: '#ffffff', acc: 'crown', glow: '#ffe066', trail: 'gold' },
-  { id: 'rainbow', name: 'Радужный', price: 999, rainbow: true, dark: '#4a4a66', eye: '#ffffff', trail: 'rainbow' },
-  { id: 'champion', name: 'Чемпион', price: 0, req: 'final', body: '#2e3a8c', dark: '#ffd54a', eye: '#ffd54a', acc: 'crown', glow: '#8fe9ff', trail: 'rainbow' },
+  { id: 'classic', name: 'Классик', name_en: 'Classic', price: 0, body: '#6fd3ff', dark: '#2f87c4', eye: '#8ff7ff' },
+  { id: 'mint', name: 'Мятный', name_en: 'Mint', price: 40, body: '#7af0c1', dark: '#2aa77a', eye: '#e9fff6' },
+  { id: 'sunny', name: 'Солнечный', name_en: 'Sunny', price: 60, body: '#ffd54a', dark: '#c49a00', eye: '#fff6c2' },
+  { id: 'rose', name: 'Розочка', name_en: 'Rosy', price: 90, body: '#ff9fcf', dark: '#c04f95', eye: '#ffe0f2', acc: 'bow' },
+  { id: 'cowboy', name: 'Ковбой', name_en: 'Cowboy', price: 120, body: '#d9a066', dark: '#8f5a2b', eye: '#8ff7ff', acc: 'hat' },
+  { id: 'ninja', name: 'Ниндзя', name_en: 'Ninja', price: 150, body: '#3a3f55', dark: '#1b1e2b', eye: '#ff3b3b', acc: 'band', trail: 'smoke' },
+  { id: 'dj', name: 'Диджей', name_en: 'DJ', price: 200, body: '#56e39f', dark: '#1f8a58', eye: '#ffffff', acc: 'phones', trail: 'notes' },
+  { id: 'king', name: 'Король', name_en: 'King', price: 260, body: '#b48cff', dark: '#6b3fc4', eye: '#ffffff', acc: 'crown', trail: 'sparkle' },
+  { id: 'devil', name: 'Чертёнок', name_en: 'Imp', price: 320, body: '#ff5d5d', dark: '#9a1f1f', eye: '#ffd54a', acc: 'horns', trail: 'fire' },
+  { id: 'angel', name: 'Ангел', name_en: 'Angel', price: 320, body: '#ffffff', dark: '#b8c4e0', eye: '#6fd3ff', acc: 'halo', trail: 'sparkle' },
+  { id: 'ghost', name: 'Призрак', name_en: 'Phantom', price: 400, body: '#e8f0ff', dark: '#9aa8c8', eye: '#1b1b2a', alpha: 0.72, trail: 'ghost' },
+  { id: 'magma', name: 'Магма', name_en: 'Magma', price: 550, body: '#ff6a3d', dark: '#5a1a0a', eye: '#ffd54a', glow: '#ff8a3d', trail: 'fire' },
+  { id: 'gold', name: 'Золотой', name_en: 'Golden', price: 700, body: '#ffd700', dark: '#b8860b', eye: '#ffffff', acc: 'crown', glow: '#ffe066', trail: 'gold' },
+  { id: 'rainbow', name: 'Радужный', name_en: 'Rainbow', price: 999, rainbow: true, dark: '#4a4a66', eye: '#ffffff', trail: 'rainbow' },
+  { id: 'champion', name: 'Чемпион', name_en: 'Champion', price: 0, req: 'final', body: '#2e3a8c', dark: '#ffd54a', eye: '#ffd54a', acc: 'crown', glow: '#8fe9ff', trail: 'rainbow' },
 ];
 
 function skinById(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
@@ -139,7 +139,7 @@ function drawRobot(p, x, y, alpha = 1, ghost = false, g = ctx, skin = currentSki
   // антенна (жёлтая, когда рывок готов)
   c.strokeStyle = dark; c.lineWidth = 2;
   c.beginPath(); c.moveTo(0, -27); c.lineTo(-2, -33); c.stroke();
-  const ready = p.canDash && p.dashCD <= 0;
+  const ready = p.airDashes === undefined ? (p.canDash && p.dashCD <= 0) : abilityReady(p);
   c.fillStyle = ready ? '#ffd54a' : '#5a6380';
   if (ready && !ghost) {
     c.save(); c.globalAlpha = alpha * 0.35;

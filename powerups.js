@@ -4,9 +4,9 @@
 //  Бонусы: щит, магнит, звезда
 // ============================================================
 const POWERUPS = {
-  '!': { kind: 'shield', color: '#6fd3ff', icon: '🛡️', name: 'Щит', hint: 'спасёт от одного удара' },
-  '&': { kind: 'magnet', color: '#ff5d73', icon: '🧲', name: 'Магнит', hint: 'притягивает монеты', time: 12 },
-  '*': { kind: 'star', color: '#ffd54a', icon: '⭐', name: 'Звезда', hint: 'неуязвимость и скорость', time: 8 },
+  '!': { kind: 'shield', color: '#6fd3ff', icon: 'shield' },
+  '&': { kind: 'magnet', color: '#ff5d73', icon: 'magnet', time: 12 },
+  '*': { kind: 'star', color: '#ffd54a', icon: 'star', time: 8 },
 };
 
 function makePowerup(c, px, py) {
@@ -23,16 +23,19 @@ function updatePowerups(L, p, dt) {
     Sound.play('powerup');
     emit(u.x + 12, u.y + 12, 24, { color: [u.color, '#ffffff'], speed: 260, grav: 0, life: 0.6 });
     ring(u.x + 12, u.y + 12, u.color);
-    floatText(u.x + 12, u.y - 6, `${u.name}: ${u.hint}`, u.color);
+    const [nm, hint] = T('powerups')[u.kind];
+    floatText(u.x + 12, u.y - 6, `${nm}: ${hint}`, u.color);
   }
   if (p.dead) return;
-  if (p.magnet > 0) {
-    p.magnet -= dt;
+  if (p.magnet > 0) p.magnet -= dt;
+  // магнит: бонус или пассивное улучшение
+  const rad = p.magnet > 0 ? 170 : (pasLv('magnet') ? 30 + 40 * pasLv('magnet') : 0);
+  if (rad) {
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
     for (const c of L.coins) {
       if (c.taken) continue;
       const dx = cx - (c.x + 8), dy = cy - (c.y + 8), d = Math.hypot(dx, dy);
-      if (d < 170) { c.x += dx / d * 420 * dt; c.y += dy / d * 420 * dt; }
+      if (d < rad && d > 1) { c.x += dx / d * 420 * dt; c.y += dy / d * 420 * dt; }
     }
   }
   if (p.star > 0) {
@@ -56,9 +59,7 @@ function drawPowerups(L, t) {
     ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(u.icon, cx, cy + 1);
-    ctx.textBaseline = 'alphabetic';
+    drawIcon(ctx, u.icon, cx, cy, 16);
     // блик, бегающий по кругу
     const a = t * 3 + u.phase;
     ctx.fillStyle = '#fff';
@@ -101,9 +102,9 @@ function drawPlayerPowers(p, t) {
 function powerHud(p) {
   const parts = [];
   if (p && !p.dead) {
-    if (p.shield) parts.push('🛡️');
-    if (p.magnet > 0) parts.push(`🧲 ${Math.ceil(p.magnet)}`);
-    if (p.star > 0) parts.push(`⭐ ${Math.ceil(p.star)}`);
+    if (p.shield) parts.push(ico('shield'));
+    if (p.magnet > 0) parts.push(`${ico('magnet')}${Math.ceil(p.magnet)}`);
+    if (p.star > 0) parts.push(`${ico('star')}${Math.ceil(p.star)}`);
   }
   return parts.join('  ');
 }

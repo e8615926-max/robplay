@@ -39,7 +39,7 @@ const Wheel = {
     $('wheel-wallet').textContent = Save.data.wallet;
     const btn = $('btn-spin');
     btn.disabled = left <= 0 || this.spinT >= 0;
-    btn.textContent = left > 0 ? `🎡 Крутить! (${left}/${WHEEL_SPINS})` : '⏳ Новые попытки завтра';
+    btn.innerHTML = left > 0 ? `${ico('wheel')}${T('spin')} (${left}/${WHEEL_SPINS})` : `${ico('clock')}${T('spinsTomorrow')}`;
   },
 
   spin() {
@@ -71,18 +71,18 @@ const Wheel = {
       if (pool.length) {
         const s = pool[Math.floor(Math.random() * pool.length)];
         Save.data.skins.push(s.id);
-        text = `🎉 Скин «${s.name}»!`;
+        text = `${ico('palette')}${T('skinPrize')} «${tr(s, 'name')}»!`;
       } else {
         Save.data.wallet += 200;
-        text = '🎉 Все скины уже твои — держи 200 🪙!';
+        text = `${T('allSkins')} ${ico('coin')}`;
       }
     } else {
       Save.data.wallet += p.coins;
       Save.data.stats.coins += p.coins;
-      text = `🎉 +${p.coins} 🪙`;
+      text = `+${p.coins} ${ico('coin')}`;
     }
     Save.store();
-    $('wheel-result').textContent = text;
+    $('wheel-result').innerHTML = text;
     Sound.play(p.coins >= 100 || p.skin ? 'jackpot' : 'win');
     for (let i = 0; i < 70; i++) {
       this.bits.push({ x: 160, y: 160, vx: rand(-260, 260), vy: rand(-380, -60), life: rand(1, 1.8), c: ['#ffd54a', '#ff7ac8', '#6fd3ff', '#56e39f'][i % 4], r: rand(0, 6) });
@@ -134,10 +134,11 @@ const Wheel = {
       c.save();
       c.rotate((i + 0.5) * seg);
       c.fillStyle = '#fff';
-      c.font = `bold ${p.skin ? 15 : 20}px system-ui, sans-serif`;
+      c.font = 'bold 20px system-ui, sans-serif';
       c.textAlign = 'right'; c.textBaseline = 'middle';
       c.shadowColor = 'rgba(0,0,0,0.4)'; c.shadowBlur = 4;
-      c.fillText(p.skin ? '🎨 СКИН' : `${p.label} 🪙`, R - 12, 0);
+      if (p.skin) drawIcon(c, 'palette', R - 26, 0, 26, '#ffffff');
+      else { c.fillText(p.label, R - 32, 1); c.shadowBlur = 0; drawIcon(c, 'coin', R - 18, 0, 18); }
       c.restore();
     }
     c.restore();

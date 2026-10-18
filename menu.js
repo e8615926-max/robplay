@@ -82,6 +82,9 @@ const MenuScene = {
     if (!this.robot) this.reset();
     const showRobot = opts.robot !== false, showItems = opts.items !== false;
     const t = this.t || performance.now() / 1000, W = viewW, H = viewH, gy = this.groundY();
+    const style = Save.data.menuStyle || 'neon';
+    if (style !== 'neon') this.drawStyled(style, t, W, H, gy);
+    else {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
     const pal = { sunset: ['#120b33', '#4a2a7a', '#d9587a', '#ffb36b'], red: ['#1a0308', '#5a0a1a', '#b8202a', '#ff6a3d'], night: ['#03020a', '#0d0a2a', '#1d1645', '#2e2260'] }[opts.sky || 'sunset'];
@@ -184,6 +187,8 @@ const MenuScene = {
     ctx.strokeStyle = 'rgba(255,93,143,0.35)'; ctx.lineWidth = 1;
     for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(0, gy + k * 18); ctx.lineTo(W, gy + k * 18); ctx.stroke(); }
 
+    }
+
     // монеты и шипы
     for (const it of showItems ? this.items : []) {
       if (it.kind === 'spike') {
@@ -205,5 +210,147 @@ const MenuScene = {
     // робот в выбранном скине
     const r = this.robot, rx = this.robotX();
     if (showRobot) { drawRobot(r, rx - 11, gy - 28 + r.y, 1, false, ctx); drawParticles(); }
+    if (style === 'retro') {
+      // строки развёртки, как на старом телевизоре
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      for (let y = 0; y < canvas.height; y += 4) ctx.fillRect(0, y, canvas.width, 2);
+    }
+  },
+
+  // Фоны меню в стиле разных игр
+  drawStyled(style, t, W, H, gy) {
+    const d = this.dist;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    if (style === 'retro') {
+      // ---- 8-битная приставка: полосатое небо, ступенчатые горы, кирпичная дорога
+      const bands = ['#1d1a4a', '#2b2a7a', '#3d3ca8', '#5c5ccc', '#8a6ad8', '#c07ad0'];
+      bands.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(0, i * gy / bands.length, W, gy / bands.length + 1); });
+      ctx.fillStyle = '#fce0a8';
+      for (let i = 0; i < 40; i++) {
+        if (Math.floor(t * 2 + i) % 5 === 0) continue;
+        ctx.fillRect(Math.floor(hash(i) * W / 4) * 4, Math.floor(hash(i + 9) * gy * 0.4 / 4) * 4, 4, 4);
+      }
+      ctx.fillStyle = '#ffe36b';
+      ctx.fillRect(W * 0.75, gy * 0.2, 48, 48);
+      ctx.fillStyle = '#ffb347'; ctx.fillRect(W * 0.75 + 8, gy * 0.2 + 8, 32, 32);
+      const pixMount = (par, baseY, amp, col, seed) => {
+        ctx.fillStyle = col;
+        const step = 16, off = (d * par) % step;
+        for (let x = -off; x < W + step; x += step) {
+          const wx = Math.floor((x + d * par) / step);
+          const h = Math.floor((Math.sin(wx * 0.35 + seed) * 0.5 + 0.5 + Math.sin(wx * 0.11) * 0.3) * amp / 8) * 8;
+          ctx.fillRect(Math.floor(x), baseY - h, step, h + H);
+        }
+      };
+      pixMount(0.15, gy - 40, 160, '#4a3a8a', 1);
+      pixMount(0.4, gy, 90, '#2a6a4a', 4);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 4; i++) {
+        const x = Math.floor((((i * 380 - d * 0.2) % (W + 200)) + W + 200) % (W + 200) - 100), y = 60 + i * 30;
+        ctx.fillRect(x, y, 64, 16); ctx.fillRect(x + 16, y - 16, 32, 16);
+      }
+      ctx.fillStyle = '#c84c0c'; ctx.fillRect(0, gy, W, H - gy);
+      ctx.fillStyle = '#000';
+      const off = d % 32;
+      for (let y = gy; y < H; y += 16) {
+        ctx.fillRect(0, y, W, 2);
+        for (let x = -off + ((y - gy) / 16 % 2 ? 16 : 0); x < W; x += 32) ctx.fillRect(x, y, 2, 16);
+      }
+      ctx.fillStyle = '#fc9838'; ctx.fillRect(0, gy, W, 4);
+    } else if (style === 'blocks') {
+      // ---- кубический мир: квадратное солнце, блочные облака и рельеф
+      const sky = ctx.createLinearGradient(0, 0, 0, gy);
+      sky.addColorStop(0, '#78a7ff'); sky.addColorStop(1, '#c4dcff');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff6a8'; ctx.fillRect(W * 0.78, 50, 56, 56);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 5; i++) {
+        const x = (((i * 330 - d * 0.1 - t * 6) % (W + 300)) + W + 300) % (W + 300) - 150;
+        ctx.globalAlpha = 0.9;
+        ctx.fillRect(x, 70 + i * 22, 120, 24); ctx.fillRect(x + 24, 58 + i * 22, 60, 12);
+        ctx.globalAlpha = 1;
+      }
+      const B = 24;
+      const col = (par, base, amp, top, dirt, seed) => {
+        const off = (d * par) % B;
+        for (let x = -off; x < W + B; x += B) {
+          const wx = Math.floor((x + d * par) / B);
+          const h = Math.floor((Math.sin(wx * 0.3 + seed) * 0.5 + 0.5 + Math.sin(wx * 0.07) * 0.4) * amp / B) * B;
+          const y = base - h;
+          ctx.fillStyle = dirt; ctx.fillRect(x, y, B, H);
+          ctx.fillStyle = top; ctx.fillRect(x, y, B, 6);
+          ctx.fillStyle = 'rgba(0,0,0,0.12)';
+          for (let yy = y; yy < H; yy += B) ctx.fillRect(x, yy, B, 1), ctx.fillRect(x, yy, 1, B);
+          if (par > 0.3 && hash(wx) > 0.88) {
+            ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + 8, y - 48, 8, 48);
+            ctx.fillStyle = '#2f7a2f'; ctx.fillRect(x - 12, y - 84, 48, 40);
+            ctx.fillStyle = '#3d9a3d'; ctx.fillRect(x - 4, y - 96, 32, 16);
+          }
+        }
+      };
+      col(0.15, gy - 70, 180, '#7a8a9a', '#5a6a7a', 2);
+      col(0.4, gy - 10, 120, '#5cb84a', '#8a5a34', 7);
+      ctx.fillStyle = '#8a5a34'; ctx.fillRect(0, gy, W, H);
+      ctx.fillStyle = '#5cb84a'; ctx.fillRect(0, gy, W, 8);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      const off = d % B;
+      for (let x = -off; x < W; x += B) ctx.fillRect(x, gy, 1, H);
+      for (let y = gy + B; y < H; y += B) ctx.fillRect(0, y, W, 1);
+      ctx.fillStyle = '#7a7a7a';
+      for (let x = -off; x < W; x += B) if (hash(Math.floor((x + d) / B)) > 0.7) ctx.fillRect(x + 6, gy + 30, 8, 6);
+    } else {
+      // ---- мультик: яркое небо, солнце с лицом, холмы с глазками, облака
+      const sky = ctx.createLinearGradient(0, 0, 0, gy);
+      sky.addColorStop(0, '#4fb6ff'); sky.addColorStop(1, '#b8e6ff');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      const sx = W * 0.8, sy = 90;
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(t * 0.3);
+      ctx.fillStyle = '#ffd54a';
+      for (let k = 0; k < 12; k++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(-6, -40); ctx.lineTo(0, -56); ctx.lineTo(6, -40); ctx.fill(); }
+      ctx.restore();
+      ctx.fillStyle = '#ffe36b'; ctx.strokeStyle = '#3a2a10'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(sx, sy, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#3a2a10';
+      ctx.beginPath(); ctx.ellipse(sx - 12, sy - 6, 4, 7, 0, 0, Math.PI * 2); ctx.ellipse(sx + 12, sy - 6, 4, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy + 8, 12, 0.2, Math.PI - 0.2); ctx.stroke();
+      const cloud = (x, y, s) => {
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2a3a6a'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, y, 22 * s, Math.PI * 0.5, Math.PI * 1.5);
+        ctx.arc(x + 26 * s, y - 16 * s, 24 * s, Math.PI, Math.PI * 2);
+        ctx.arc(x + 56 * s, y, 22 * s, Math.PI * 1.5, Math.PI * 0.5);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#2a3a6a';
+        ctx.fillRect(x + 18 * s, y - 8 * s, 4, 8); ctx.fillRect(x + 32 * s, y - 8 * s, 4, 8);
+      };
+      for (let i = 0; i < 4; i++) cloud((((i * 360 - d * 0.1 - t * 10) % (W + 300)) + W + 300) % (W + 300) - 150, 80 + (i % 2) * 50, 0.8 + (i % 3) * 0.15);
+      const hills = (par, baseY, col, eyes) => {
+        const sp = 260, off = (d * par) % sp;
+        for (let x = -off - sp; x < W + sp; x += sp) {
+          const wx = Math.floor((x + d * par) / sp), h = 90 + hash(wx + par) * 80, w = 150 + hash(wx * 2) * 60;
+          ctx.fillStyle = col; ctx.strokeStyle = '#1f4a1f'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(x - w, baseY); ctx.quadraticCurveTo(x, baseY - h * 2, x + w, baseY); ctx.fill(); ctx.stroke();
+          if (eyes) {
+            const blink = (t + wx) % 4 < 0.15;
+            ctx.fillStyle = '#1f2a1f';
+            ctx.fillRect(x - 14, baseY - h * 0.75, 6, blink ? 2 : 14); ctx.fillRect(x + 8, baseY - h * 0.75, 6, blink ? 2 : 14);
+          }
+        }
+      };
+      hills(0.15, gy - 10, '#7fd36a', false);
+      hills(0.4, gy + 10, '#4fbf4a', true);
+      ctx.fillStyle = '#c87a3a'; ctx.fillRect(0, gy, W, H);
+      ctx.fillStyle = '#5cd04a'; ctx.strokeStyle = '#1f4a1f'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(0, gy + 12);
+      for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, gy + 10 + Math.sin((x + d) * 0.05) * 3);
+      ctx.lineTo(W, gy - 2); ctx.lineTo(0, gy - 2); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, gy + 10 + Math.sin((x + d) * 0.05) * 3);
+      ctx.stroke();
+      ctx.fillStyle = '#a85a2a';
+      const off = d % 60;
+      for (let x = -off; x < W; x += 60) { ctx.beginPath(); ctx.arc(x + 20, gy + 40, 5, 0, Math.PI * 2); ctx.arc(x + 45, gy + 62, 4, 0, Math.PI * 2); ctx.fill(); }
+    }
   },
 };

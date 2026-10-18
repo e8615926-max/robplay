@@ -30,6 +30,8 @@ const THEMES = [
   { sky: ['#0a3150', '#1d7a8c'], ground: '#2d4a5a', top: '#4fd1c5', topDark: '#2a8f87', mount: '#0f4a66', mount2: '#155a78', far: 'none', fx: 'bubbles' },
   { sky: ['#15161c', '#2e303c'], ground: '#3a3d4a', top: '#ffb347', topDark: '#b8742a', mount: '#1d1f28', mount2: '#25283a', far: 'none', fx: 'sparks' },
   { sky: ['#05030f', '#1b1440'], ground: '#3a3550', top: '#c08cff', topDark: '#7a4fc0', mount: '#120c2a', mount2: '#1a1238', far: 'stars', fx: 'space' },
+  { sky: ['#6fb8ff', '#ffe6c2'], ground: '#c9a35a', top: '#ffffff', topDark: '#f0d9a0', mount: '#fdf3e4', mount2: '#ffffff', far: 'clouds', fx: 'feathers' },
+  { sky: ['#01040c', '#062033'], ground: '#0b1a2a', top: '#00ffc8', topDark: '#00a080', mount: '#061c2a', mount2: '#08263a', far: 'stars', fx: 'digital' },
 ];
 
 // ---------- Утилиты ----------
@@ -57,7 +59,8 @@ const Save = {
   data: {
     unlocked: 1, best: {}, muted: false, music: true,
     wallet: 0, skin: 'classic', skins: ['classic'], champion: false,
-    sfxVol: 1, musicVol: 1, shake: true, seen: {}, wheel: null,
+    sfxVol: 1, musicVol: 1, shake: true, wheel: null, lang: null, menuStyle: 'neon',
+    abil: { equipped: 'dash', lv: { dash: 1 }, pas: {} },
     stats: { coins: 0, deaths: 0, kills: 0, bosses: 0, time: 0, completed: 0 },
   },
   load() {
@@ -95,6 +98,16 @@ const TRACKS = {
     chords: [[62, 65, 69], [58, 62, 65], [53, 57, 60], [60, 64, 67]],
     lead: [74, 0, 77, 0, 81, 79, 77, 0, 74, 0, 70, 0, 74, 77, 0, 0, 72, 0, 77, 76, 74, 0, 72, 0, 76, 0, 79, 0, 76, 72, 0, 0],
   },
+  w4: {
+    eighth: 0.21, arpType: 'triangle', leadType: 'triangle', bassType: 'sine', drums: true,
+    chords: [[65, 69, 72], [60, 64, 67], [62, 65, 69], [58, 62, 65]],
+    lead: [77, 0, 81, 0, 84, 81, 79, 0, 76, 0, 79, 0, 81, 79, 77, 0, 74, 0, 77, 81, 79, 0, 77, 0, 74, 0, 70, 74, 77, 0, 0, 0],
+  },
+  w5: {
+    eighth: 0.16, arpType: 'sawtooth', leadType: 'square', bassType: 'square', drums: true,
+    chords: [[60, 63, 67], [56, 60, 63], [63, 67, 70], [58, 62, 65]],
+    lead: [72, 75, 79, 0, 75, 72, 0, 0, 68, 72, 75, 0, 80, 79, 75, 0, 75, 79, 82, 0, 79, 75, 0, 0, 70, 74, 77, 0, 82, 0, 77, 0],
+  },
   w3: {
     eighth: 0.18, arpType: 'sawtooth', leadType: 'square', bassType: 'sawtooth', drums: true,
     chords: [[64, 67, 71], [60, 64, 67], [57, 60, 64], [59, 63, 66]],
@@ -120,6 +133,8 @@ const AMBIENT = {
   bubbles: { type: 'lowpass', freq: 260, q: 2, vol: 0.12, wobble: true },
   embers: { type: 'lowpass', freq: 140, q: 3, vol: 0.18 },
   sparks: { type: 'lowpass', freq: 200, q: 6, vol: 0.06 },
+  digital: { type: 'bandpass', freq: 3000, q: 8, vol: 0.03, wobble: true },
+  feathers: { type: 'lowpass', freq: 600, q: 1, vol: 0.07, wobble: true },
   fireflies: { type: 'highpass', freq: 5000, q: 1, vol: 0.015 },
 };
 
@@ -264,6 +279,15 @@ const Sound = {
       case 'spin': this.tone(300, 0.5, 'sawtooth', 0.06, 900); break;
       case 'tick': this.tone(1800, 0.025, 'square', 0.06); break;
       case 'firework': this.noise(0.5, 0.18, 2500, 0.05); this.tone(1200, 0.4, 'sine', 0.05, 300); break;
+      case 'error': this.tone(200, 0.15, 'square', 0.12, 140); this.tone(150, 0.2, 'square', 0.12, 100, 0.1); break;
+      case 'hurt': this.tone(500, 0.2, 'sawtooth', 0.15, 200); this.noise(0.12, 0.2, 1500); break;
+      case 'laser': this.tone(1400, 0.12, 'square', 0.08, 500); this.tone(900, 0.1, 'sawtooth', 0.05, 300); break;
+      case 'blink': this.tone(600, 0.15, 'sine', 0.15, 1800); this.noise(0.12, 0.08, 6000, 0, this.sfxBus, 0, 'highpass'); break;
+      case 'poundStart': this.tone(700, 0.12, 'square', 0.1, 1100); break;
+      case 'ding': this.tone(2200, 0.12, 'triangle', 0.08); break;
+      case 'laserCharge': this.tone(200, 0.9, 'sawtooth', 0.06, 1200); break;
+      case 'laserFire': this.noise(0.6, 0.3, 3000, 0, this.sfxBus, 0, 'bandpass'); this.tone(120, 0.6, 'sawtooth', 0.15, 80); break;
+      case 'roar': this.tone(120, 0.6, 'sawtooth', 0.18, 60); this.noise(0.5, 0.2, 600); break;
       case 'buy': this.tone(1319, 0.08, 'square', 0.12); this.tone(1760, 0.2, 'square', 0.12, 0, 0.08); this.noise(0.15, 0.1, 6000, 0.05, this.sfxBus, 0, 'highpass'); break;
     }
   },
@@ -352,6 +376,7 @@ class Level {
     this.goal = null;
     this.boss = null;
     this.bullets = [];
+    this.pbullets = [];
     this.powerups = [];
     this.start = { x: TILE, y: TILE };
     this.ice = !!def.ice;
@@ -412,7 +437,7 @@ class Level {
 //  Игра
 // ============================================================
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');
 let dpr = 1, scale = 1, viewW = 800, viewH = VIEW_H;
 
 const Game = {
@@ -436,7 +461,8 @@ function makePlayer(x, y) {
   return {
     x: x + (TILE - 22) / 2, y: y + TILE - 28, w: 22, h: 28,
     vx: 0, vy: 0, face: 1,
-    onGround: false, wasGround: false, coyote: 0, buffer: 0, jumps: 1,
+    onGround: false, wasGround: false, coyote: 0, buffer: 0, jumps: airJumps(),
+    airDashes: maxAirDashes(), hp: maxHearts(), maxHp: maxHearts(), pound: false, gliding: false,
     wallDir: 0, wallLock: 0, sliding: false,
     dashT: 0, dashCD: 0, canDash: true, dashDir: 1,
     standOn: null, bounced: false,
@@ -458,8 +484,8 @@ function emit(x, y, n, opt = {}) {
     });
   }
 }
-function floatText(x, y, text, color = '#ffd54a') {
-  Game.texts.push({ x, y, text, color, life: 1 });
+function floatText(x, y, text, color = '#ffd54a', icon = null) {
+  Game.texts.push({ x, y, text, color, icon, life: 1 });
 }
 function updateParticles(dt) {
   for (let i = Game.texts.length - 1; i >= 0; i--) {
@@ -491,14 +517,14 @@ function startLevel(i) {
   Game.iris = 0;
   snapCamera();
   Weather.init(Game.level);
-  Sound.setTrack(LEVELS[i].boss ? 'boss' : ['w1', 'w2', 'w3'][Math.min(2, Math.floor(i / 10))]);
+  Sound.setTrack(LEVELS[i].boss ? 'boss' : ['w1', 'w2', 'w3', 'w4', 'w5'][Math.min(4, Math.floor(i / 10))]);
   Sound.setAmbient(Game.level.def.theme === 5 ? 'embers' : Game.level.theme.fx);
   Game.rings = [];
   Game.coinCombo = 0; Game.coinT = 0;
   setState('playing');
   UI.updateHud(true);
   UI.updateBoss(Game.level.boss);
-  UI.toast(`<span class="t-title">${i + 1}. ${LEVELS[i].name}</span>${LEVELS[i].tip}`, 5200);
+  UI.toast(`<span class="t-title">${i + 1}. ${levelName(i)}</span>${levelTip(i)}`, 5200);
 }
 
 function respawn() {
@@ -514,6 +540,17 @@ function killPlayer(cause) {
   if (p.dead) return;
   if (cause !== 'fall') {
     if (p.star > 0) return;
+    if (p.hp > 1) {
+      p.hp--;
+      p.spawnT = 1.3;
+      p.vy = -360; p.vx = -p.face * 220; p.wallLock = 0.2; p.pound = false;
+      Sound.play('hurt');
+      Game.shake = Math.max(Game.shake, 6);
+      Game.flash = 0.18;
+      emit(p.x + p.w / 2, p.y + p.h / 2, 14, { color: ['#ff4d6d', '#ffffff'], speed: 220, life: 0.5 });
+      UI.updateHud();
+      return;
+    }
     if (p.shield) {
       p.shield = false;
       p.spawnT = 1.2;
@@ -633,9 +670,10 @@ function moveY(p, dt, canDrop) {
 
 function land(p, tx, ty, c) {
   const L = Game.level;
+  if (p.pound) poundImpact(p);
   if (c === 'B') {
     p.vy = -BOUNCE_V; p.onGround = false; p.bounced = true;
-    p.jumps = 1; p.canDash = true; p.sx = 0.7; p.sy = 1.35;
+    p.jumps = airJumps(); refillAbility(p); p.sx = 0.7; p.sy = 1.35;
     L.bounceAnim = { tx, ty, t: 0.3 };
     emit(tx * TILE + 16, ty * TILE, 14, { color: ['#ffd54a', '#fff'], angle: -Math.PI / 2, spread: 1, speed: 300 });
     Sound.play('bounce');
@@ -667,28 +705,26 @@ function updatePlayer(p, dt) {
   p.coyote = p.onGround ? COYOTE : Math.max(0, p.coyote - dt);
   p.wallLock = Math.max(0, p.wallLock - dt);
   p.dashCD = Math.max(0, p.dashCD - dt);
-  if (p.onGround) { p.jumps = 1; if (p.dashT <= 0) p.canDash = true; }
+  if (p.onGround) { p.jumps = airJumps(); if (p.dashT <= 0) refillAbility(p); }
 
-  // Рывок
-  if (Input.pressed('dash') && p.canDash && p.dashCD <= 0 && p.dashT <= 0) {
-    p.dashT = DASH_T; p.dashCD = DASH_CD; p.canDash = false;
-    p.dashDir = dir || p.face; p.face = p.dashDir;
-    p.vy = 0; p.sx = 1.4; p.sy = 0.7;
-    Game.shake = Math.max(Game.shake, 4);
-    emit(p.x + p.w / 2, p.y + p.h / 2, 12, { color: ['#ffd54a', '#fff'], angle: p.dashDir > 0 ? Math.PI : 0, spread: 0.5, speed: 260, grav: 0, life: 0.4 });
-    Sound.play('dash');
-  }
+  // Способность (рывок, удар-молот, бластер, телепорт; планер — пока зажата)
+  if (Input.pressed('dash')) useAbility(p, dir);
 
   if (p.dashT > 0) {
     p.dashT -= dt;
     p.vx = p.dashDir * DASH_V;
     p.vy = 0;
     if (p.dashT <= 0) p.vx = p.dashDir * RUN;
+  } else if (p.pound) {
+    // удар-молот: короткая пауза в воздухе и стремительное падение
+    p.vx = 0;
+    if (p.poundHang > 0) { p.poundHang -= dt; p.vy = 0; }
+    else { p.vy = 1150; if (Math.random() < 0.6) emit(p.x + p.w / 2, p.y, 1, { color: '#ffffffaa', speed: 30, grav: -100, life: 0.3, size: 4 }); }
   } else {
     if (p.wallLock <= 0) {
       let acc = p.onGround ? (dir ? ACC_GROUND : DEC_GROUND) : ACC_AIR;
       if (L.ice && p.onGround && !p.standOn) acc = dir ? 650 : 280;   // лёд скользкий (платформы — нет)
-      p.vx = approach(p.vx, dir * RUN * (p.star > 0 ? 1.3 : 1), acc * dt);
+      p.vx = approach(p.vx, dir * runSpeed() * (p.star > 0 ? 1.3 : 1), acc * dt);
       if (dir) p.face = dir;
     }
     // Гравитация: короткое нажатие — низкий прыжок
@@ -696,6 +732,12 @@ function updatePlayer(p, dt) {
     if (p.vy < 0 && !Input.is('jump') && !p.bounced) g *= 2;
     if (p.vy > 0) p.bounced = false;
     p.vy += g * dt;
+    // планер: пока кнопка зажата, падаем медленно
+    p.gliding = equipped() === 'glide' && Input.is('dash') && !p.onGround && p.vy > 0;
+    if (p.gliding) {
+      p.vy = Math.min(p.vy, 100 - 22 * (Math.max(1, abilLv('glide')) - 1));
+      if (Math.random() < 0.15) emit(p.x + p.w / 2, p.y - 8, 1, { color: '#ffffff88', speed: 20, grav: 0, life: 0.4 });
+    }
 
     // Стены
     p.wallDir = 0;
@@ -719,7 +761,7 @@ function updatePlayer(p, dt) {
         Sound.play('jump');
       } else if (p.wallDir !== 0) {
         p.vy = -WALL_JUMP_VY; p.vx = -p.wallDir * WALL_JUMP_VX; p.face = -p.wallDir;
-        p.wallLock = 0.16; p.buffer = 0; p.jumps = 1; p.canDash = true;
+        p.wallLock = 0.16; p.buffer = 0; p.jumps = airJumps(); refillAbility(p);
         p.sx = 0.75; p.sy = 1.3;
         emit(p.x + (p.wallDir > 0 ? p.w : 0), p.y + p.h / 2, 8, { color: '#ffffffcc', angle: p.wallDir > 0 ? Math.PI : 0, spread: 0.8, speed: 150, grav: 200, life: 0.35 });
         Sound.play('walljump');
@@ -790,7 +832,7 @@ function updatePlayer(p, dt) {
       k.active = true;
       k.actT = L.time;
       ring(k.x + 8, k.y + 20, '#56e39f', 60);
-      floatText(k.x + 8, k.y - 6, 'Чекпоинт!', '#56e39f');
+      floatText(k.x + 8, k.y - 6, T('checkpoint'), '#56e39f');
       L.respawnPoint = { x: k.x - 8, y: k.y + 32 };
       emit(k.x + 8, k.y + 6, 20, { color: ['#56e39f', '#fff'], speed: 220, life: 0.7 });
       Sound.play('checkpoint');
@@ -847,6 +889,7 @@ function updateWorld(dt) {
   updateEnemies(L, p, dt);
   updateBullets(L, p, dt);
   updatePowerups(L, p, dt);
+  updatePBullets(L, dt);
   if (L.boss) updateBoss(L, L.boss, p, dt);
 
   updatePlayer(p, dt);
@@ -1053,7 +1096,7 @@ function drawTiles(L, cam, t) {
 }
 
 // Узор блока по теме + затемнение в глубине
-const BLOCK_PATTERN = { 2: 'brick', 10: 'brick', 3: 'candy', 7: 'ice', 11: 'tech', 9: 'stone', 5: 'stone', 4: 'stone' };
+const BLOCK_PATTERN = { 2: 'brick', 10: 'brick', 3: 'candy', 7: 'ice', 11: 'tech', 9: 'stone', 5: 'stone', 4: 'stone', 12: 'gold', 13: 'circuit' };
 function drawBlockPattern(L, tx, ty, x, y) {
   const pat = BLOCK_PATTERN[L.def.theme] || 'dirt';
   ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1;
@@ -1076,6 +1119,18 @@ function drawBlockPattern(L, tx, ty, x, y) {
   } else if (pat === 'ice') {
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath(); ctx.moveTo(x + 6, y + 30); ctx.lineTo(x + 14, y + 18); ctx.lineTo(x + 26, y + 22); ctx.stroke();
+  } else if (pat === 'gold') {
+    ctx.strokeStyle = 'rgba(120,80,20,0.25)';
+    ctx.strokeRect(x + 2.5, y + 2.5, TILE - 5, TILE - 5);
+    ctx.fillStyle = 'rgba(255,240,200,0.18)'; ctx.fillRect(x + 4, y + 4, 6, 2);
+  } else if (pat === 'circuit') {
+    ctx.strokeStyle = 'rgba(0,255,200,0.28)';
+    const h = hash(tx * 2.3 + ty * 5.9);
+    ctx.beginPath();
+    ctx.moveTo(x, y + 10 + h * 12); ctx.lineTo(x + 12, y + 10 + h * 12); ctx.lineTo(x + 18, y + 4 + h * 20); ctx.lineTo(x + TILE, y + 4 + h * 20);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(0,255,200,${0.3 + 0.3 * Math.sin(performance.now() / 300 + tx)})`;
+    ctx.fillRect(x + 11, y + 8 + h * 12, 3, 3);
   } else if (pat === 'tech') {
     ctx.strokeRect(x + 3.5, y + 3.5, TILE - 7, TILE - 7);
     ctx.fillStyle = 'rgba(192,140,255,0.25)';
@@ -1178,8 +1233,10 @@ function drawTexts() {
   ctx.textAlign = 'center';
   for (const f of Game.texts) {
     ctx.globalAlpha = Math.min(1, f.life * 2);
-    ctx.fillStyle = '#1b1b2a'; ctx.fillText(f.text, f.x + 1, f.y + 1);
-    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+    const w = f.icon ? ctx.measureText(f.text).width / 2 + 7 : 0;
+    ctx.fillStyle = '#1b1b2a'; ctx.fillText(f.text, f.x + 1 - (f.icon ? 7 : 0), f.y + 1);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x - (f.icon ? 7 : 0), f.y);
+    if (f.icon) drawIcon(ctx, f.icon, f.x + w, f.y - 5, 13);
   }
   ctx.globalAlpha = 1;
 }
@@ -1195,7 +1252,6 @@ function drawParticles() {
 
 function render(t) {
   const L = Game.level;
-  if (Game.state === 'cutscene') { Cutscene.draw(); return; }
   if (Game.state === 'menu' || !L) { MenuScene.draw(); return; }
   const cam = { x: Game.cam.x, y: Game.cam.y };
   if (Game.shake > 0.1 && Save.data.shake) { cam.x += rand(-Game.shake, Game.shake); cam.y += rand(-Game.shake, Game.shake); }
@@ -1220,6 +1276,7 @@ function render(t) {
   drawEnemies(L, t);
   if (L.boss) drawBoss(L, L.boss, t);
   drawBullets(L, t);
+  drawPBullets(L, t);
 
   const p = Game.player;
   if (p && Game.state !== 'menu') {
@@ -1233,6 +1290,7 @@ function render(t) {
     }
     if (!p.dead && !(p.spawnT > 0 && Math.floor(p.spawnT * 20) % 2 === 0)) drawRobot(p, p.x, p.y);
     drawPlayerPowers(p, t);
+    drawGlider(p, t);
     if (p.idleT > 4 && !p.dead) {
       // робот задремал
       ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center';
@@ -1278,12 +1336,23 @@ function render(t) {
 //  Интерфейс
 // ============================================================
 const $ = id => document.getElementById(id);
+const STYLES = ['neon', 'retro', 'blocks', 'cartoon'];
+const BESTIARY = { walker: 'E', jumper: 'J', spiker: 'S', charger: 'H', turret: 'T', flyer: 'F', swooper: 'W', ghost: 'Q', saw: 'O', dropper: 'D', snail: 'N', slime: 'Y', spider: 'U', bomber: 'A', launcher: 'R' };
+
+// Рисует на другом холсте теми же функциями отрисовки
+function renderTo(c, fn) {
+  const old = ctx;
+  ctx = c;
+  try { fn(); } finally { ctx = old; }
+}
+
 const UI = {
   toastTimer: null,
   last: {},
+  worldTab: 0,
 
   show(name) {
-    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats', 'wheel']) {
+    for (const s of ['menu', 'levels', 'howto', 'pause', 'complete', 'shop', 'settings', 'stats', 'wheel', 'upgrades']) {
       $('screen-' + s).classList.toggle('hidden', s !== name);
     }
     this.shopOpen = name === 'shop';
@@ -1310,15 +1379,15 @@ const UI = {
       card.appendChild(cv);
       const name = document.createElement('div');
       name.className = 'skin-name';
-      name.textContent = skin.name;
+      name.textContent = tr(skin, 'name');
       card.appendChild(name);
       const btn = document.createElement('button');
       btn.className = 'btn small';
-      if (selected) { btn.textContent = '✔ Выбран'; btn.disabled = true; }
-      else if (owned) { btn.textContent = 'Выбрать'; btn.classList.add('primary'); }
-      else if (skin.req === 'final') { btn.textContent = '🔒 Пройди игру'; btn.disabled = true; }
+      if (selected) { btn.innerHTML = ico('check') + T('selected'); btn.disabled = true; }
+      else if (owned) { btn.textContent = T('choose'); btn.classList.add('primary'); }
+      else if (skin.req === 'final') { btn.innerHTML = ico('lock') + T('beatGame'); btn.disabled = true; }
       else {
-        btn.textContent = `🪙 ${skin.price}`;
+        btn.innerHTML = ico('coin') + skin.price;
         if (Save.data.wallet < skin.price) btn.classList.add('off');
       }
       btn.addEventListener('click', e => {
@@ -1332,10 +1401,10 @@ const UI = {
           Save.data.skin = skin.id;
           Save.store();
           Sound.play('buy');
-          this.toast(`<span class="t-title">Новый скин!</span>${skin.name} — теперь твой`, 2200);
+          this.toast(`<span class="t-title">${T('newSkin')}</span>${tr(skin, 'name')} — ${T('isYours')}`, 2200);
         } else {
-          Sound.play('death');
-          this.toast(`Не хватает монет: нужно ещё 🪙 ${skin.price - Save.data.wallet}`, 2000);
+          Sound.play('error');
+          this.toast(`${T('needMore')} ${ico('coin')}${skin.price - Save.data.wallet}`, 2000);
           return;
         }
         this.buildShop();
@@ -1359,6 +1428,97 @@ const UI = {
     drawRobot(pose, cv.width / 6 - 11, cv.height / 3 - 34 - hop, 1, false, c);
   },
 
+  // ---------- Улучшения ----------
+  buildUpgrades() {
+    $('up-wallet').textContent = Save.data.wallet;
+    const st = abilState();
+    const pips = (lv, max) => `<span class="pips">${Array.from({ length: max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</span>`;
+    const pay = (cost, after) => {
+      if (Save.data.wallet < cost) {
+        Sound.play('error');
+        this.toast(`${T('needMore')} ${ico('coin')}${cost - Save.data.wallet}`, 2000);
+        return;
+      }
+      Save.data.wallet -= cost; after(); Save.store(); Sound.play('buy'); this.buildUpgrades();
+    };
+    $('up-active').innerHTML = '';
+    for (const a of ABILITIES) {
+      const lv = abilLv(a.id), isEq = st.equipped === a.id;
+      const card = document.createElement('div');
+      card.className = 'up-card' + (isEq ? ' selected' : '') + (lv ? ' owned' : '');
+      card.innerHTML = `<div class="up-icon">${ico(a.icon)}</div><div class="up-body"><b>${tr(a, 'name')}</b>
+        ${lv ? pips(lv, 3) : ''}<p>${tr(a, 'desc')}</p></div><div class="up-actions"></div>`;
+      const box = card.querySelector('.up-actions');
+      const mk = (html, cls, fn, disabled) => {
+        const b = document.createElement('button');
+        b.className = 'btn small ' + cls; b.innerHTML = html; b.disabled = !!disabled;
+        b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); fn(); });
+        box.appendChild(b);
+      };
+      if (!lv) {
+        mk(`${T('buy')} ${ico('coin')}${a.price}`, Save.data.wallet >= a.price ? 'primary' : 'off', () => pay(a.price, () => { st.lv[a.id] = 1; st.equipped = a.id; }));
+      } else {
+        if (isEq) mk(ico('check') + T('equipped'), '', () => {}, true);
+        else mk(T('equip'), 'primary', () => { st.equipped = a.id; Save.store(); Sound.play('click'); this.buildUpgrades(); });
+        if (lv < 3) {
+          const cost = a.up[lv - 1];
+          mk(`${ico('upgrade')}${T('upgrade')} ${ico('coin')}${cost}`, Save.data.wallet >= cost ? '' : 'off', () => pay(cost, () => { st.lv[a.id] = lv + 1; }));
+        } else mk(T('max'), '', () => {}, true);
+      }
+      $('up-active').appendChild(card);
+    }
+    $('up-passive').innerHTML = '';
+    for (const ps of PASSIVES) {
+      const lv = pasLv(ps.id), max = ps.cost.length;
+      const card = document.createElement('div');
+      card.className = 'up-card' + (lv ? ' owned' : '');
+      card.innerHTML = `<div class="up-icon">${ico(ps.icon)}</div><div class="up-body"><b>${tr(ps, 'name')}</b>
+        ${pips(lv, max)}<p>${tr(ps, 'desc')}</p></div><div class="up-actions"></div>`;
+      const b = document.createElement('button');
+      b.className = 'btn small';
+      if (lv >= max) { b.textContent = T('max'); b.disabled = true; }
+      else {
+        const cost = ps.cost[lv];
+        b.innerHTML = `${ico('upgrade')}${ico('coin')}${cost}`;
+        if (Save.data.wallet < cost) b.classList.add('off');
+        b.addEventListener('click', e => { e.stopPropagation(); Sound.init(); pay(cost, () => { st.pas[ps.id] = lv + 1; }); });
+      }
+      card.querySelector('.up-actions').appendChild(b);
+      $('up-passive').appendChild(card);
+    }
+    this.refreshAbilityButton();
+  },
+  refreshAbilityButton() {
+    const a = ABILITIES.find(x => x.id === equipped());
+    $('touch-ability').innerHTML = ico(a ? a.icon : 'dash');
+  },
+
+  // ---------- Справочник врагов ----------
+  buildBestiary() {
+    const box = $('bestiary');
+    box.innerHTML = '';
+    const names = T('enemyNames');
+    for (const type in BESTIARY) {
+      const item = document.createElement('div');
+      item.className = 'beast';
+      const cv = document.createElement('canvas');
+      cv.width = 112; cv.height = 96;
+      const c = cv.getContext('2d');
+      c.scale(2, 2);
+      const e = makeEnemy(BESTIARY[type], 0, 0);
+      e.t = 1.3; e.face = 1; e.grounded = true; e.timer = 1;
+      if (e.type === 'saw') { e.cx = 28; e.cy = 24; e.x = 14; e.y = 10; }
+      else if (e.type === 'spider') { e.x = 16; e.y = 16; e.anchor = 0; }
+      else if (e.type === 'dropper') { e.x = 13; e.x0 = 13; e.y = 4; e.y0 = 200; }
+      else { e.x = 28 - e.w / 2; e.y = 40 - e.h; }
+      renderTo(c, () => drawEnemy(e, 1.3));
+      item.appendChild(cv);
+      const [n, d] = names[type];
+      item.insertAdjacentHTML('beforeend', `<div><b>${n}</b><p>${d}</p></div>`);
+      box.appendChild(item);
+    }
+  },
+
   // ---------- Статистика ----------
   buildStats() {
     const st = Save.data.stats;
@@ -1366,18 +1526,18 @@ const UI = {
     for (let i = 0; i < LEVELS.length; i++) if (Save.data.best[i]) { stars += Save.data.best[i].stars; done++; }
     const h = Math.floor(st.time / 3600), m = Math.floor(st.time / 60) % 60;
     const rows = [
-      ['🪙 В копилке', Save.data.wallet],
-      ['💰 Всего заработано', st.coins],
-      ['⭐ Звёзд', `${stars} / ${LEVELS.length * 3}`],
-      ['🏁 Уровней пройдено', `${done} / ${LEVELS.length}`],
-      ['🔁 Всего прохождений', st.completed],
-      ['👾 Врагов побеждено', st.kills],
-      ['👑 Боссов побеждено', st.bosses],
-      ['💀 Падений', st.deaths],
-      ['⏱ Время в игре', h ? `${h} ч ${m} мин` : `${m} мин`],
-      ['🎨 Скинов', `${Save.data.skins.length + (Save.data.champion && !Save.data.skins.includes('champion') ? 1 : 0)} / ${SKINS.length}`],
+      ['coin', 'stBank', Save.data.wallet],
+      ['trophy', 'stEarned', st.coins],
+      ['star', 'stStars', `${stars} / ${LEVELS.length * 3}`],
+      ['map', 'stLevels', `${done} / ${LEVELS.length}`],
+      ['refresh', 'stRuns', st.completed],
+      ['bolt', 'stKills', st.kills],
+      ['crown', 'stBosses', st.bosses],
+      ['deaths', 'stDeaths', st.deaths],
+      ['clock', 'stTime', h ? `${h} ${T('hours')} ${m} ${T('mins')}` : `${m} ${T('mins')}`],
+      ['palette', 'stSkins', `${Save.data.skins.length + (Save.data.champion && !Save.data.skins.includes('champion') ? 1 : 0)} / ${SKINS.length}`],
     ];
-    $('stats-list').innerHTML = rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
+    $('stats-list').innerHTML = rows.map(([icon, k, v]) => `<span>${ico(icon)}${T(k)}</span><b>${v}</b>`).join('');
   },
 
   // ---------- Настройки ----------
@@ -1385,6 +1545,25 @@ const UI = {
     $('set-sfx').value = Math.round(Save.data.sfxVol * 100);
     $('set-music').value = Math.round(Save.data.musicVol * 100);
     $('set-shake').checked = !!Save.data.shake;
+    const seg = (id, items, cur, fn) => {
+      const box = $(id);
+      box.innerHTML = '';
+      for (const [key, label] of items) {
+        const b = document.createElement('button');
+        b.className = 'seg-btn' + (key === cur ? ' on' : '');
+        b.textContent = label;
+        b.addEventListener('click', e => { e.preventDefault(); Sound.play('click'); fn(key); this.buildSettings(); });
+        box.appendChild(b);
+      }
+    };
+    seg('set-lang', Object.entries(LANGS), lang(), k => { Save.data.lang = k; Save.store(); this.applyLang(); });
+    seg('set-style', STYLES.map(s => [s, T('styles')[s]]), Save.data.menuStyle, k => { Save.data.menuStyle = k; Save.store(); applyStyle(); });
+  },
+
+  applyLang() {
+    applyLang();
+    this.refreshToggles();
+    this.refreshMenu();
   },
 
   toast(html, ms) {
@@ -1399,15 +1578,22 @@ const UI = {
 
   updateHud(force) {
     const L = Game.level; if (!L) return;
+    const p = Game.player;
     const vals = {
-      level: `${L.index + 1}. ${L.def.name}`,
+      level: `${L.index + 1}. ${levelName(L.index)}`,
       coins: `${L.coinsTaken}/${L.coinsTotal}`,
       time: fmtTime(L.time),
       deaths: String(L.deaths),
-      powers: powerHud(Game.player),
     };
     for (const k in vals) {
       if (force || this.last[k] !== vals[k]) { $('hud-' + k).textContent = vals[k]; this.last[k] = vals[k]; }
+    }
+    const pw = powerHud(p);
+    if (force || this.last.powers !== pw) { $('hud-powers').innerHTML = pw; $('hud-powers-pill').classList.toggle('hidden', !pw); this.last.powers = pw; }
+    const hearts = p && !p.dead ? `${p.hp}/${p.maxHp}` : this.last.hearts;
+    if (p && (force || this.last.hearts !== hearts)) {
+      $('hud-hearts').innerHTML = p.maxHp > 1 ? Array.from({ length: p.maxHp }, (_, i) => ico(i < p.hp ? 'heart' : 'heartOff')).join('') : '';
+      this.last.hearts = hearts;
     }
   },
 
@@ -1415,69 +1601,78 @@ const UI = {
     const bar = $('bossbar');
     if (!b || b.dead) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
-    $('boss-name').textContent = b.name;
+    $('boss-name').textContent = tr(b, 'name');
     $('boss-fill').style.width = (b.hp / b.maxHp * 100) + '%';
   },
 
   refreshToggles() {
-    document.querySelectorAll('[data-action="toggle-sound"]').forEach(b => {
-      b.textContent = Save.data.muted ? '🔇 Звук' : '🔊 Звук'; b.classList.toggle('off', Save.data.muted);
-    });
-    document.querySelectorAll('[data-action="toggle-music"]').forEach(b => {
-      b.classList.toggle('off', !Save.data.music);
-    });
+    document.querySelectorAll('[data-action="toggle-sound"]').forEach(b => b.classList.toggle('off', Save.data.muted));
+    document.querySelectorAll('[data-action="toggle-music"]').forEach(b => b.classList.toggle('off', !Save.data.music));
   },
 
   refreshMenu() {
     let stars = 0;
     for (let i = 0; i < LEVELS.length; i++) stars += Save.data.best[i] ? Save.data.best[i].stars : 0;
-    $('menu-total').textContent = `⭐ ${stars} / ${LEVELS.length * 3}`;
-    $('menu-wallet').textContent = `🪙 ${Save.data.wallet}`;
+    $('menu-total').textContent = `${stars} / ${LEVELS.length * 3}`;
+    $('menu-wallet').textContent = Save.data.wallet;
   },
 
   buildLevels() {
+    const worlds = Math.ceil(LEVELS.length / 10);
+    const tabs = $('world-tabs');
+    tabs.innerHTML = '';
+    for (let w = 0; w < worlds; w++) {
+      const b = document.createElement('button');
+      const locked = w * 10 + 1 > Save.data.unlocked;
+      b.className = 'tab' + (w === this.worldTab ? ' on' : '') + (locked ? ' locked' : '');
+      b.innerHTML = `${locked ? ico('lock') : ''}<span>${T('world')} ${w + 1}</span><small>${T('worlds')[w] || ''}</small>`;
+      b.addEventListener('click', () => { Sound.play('click'); this.worldTab = w; this.buildLevels(); });
+      tabs.appendChild(b);
+    }
     const grid = $('level-grid');
     grid.innerHTML = '';
-    LEVELS.forEach((lv, i) => {
-      if (i % 10 === 0) {
-        const h = document.createElement('div');
-        h.className = 'world-title';
-        h.textContent = ['Мир 1 · Зелёные земли', 'Мир 2 · Стихии', 'Мир 3 · Хаос'][i / 10] || `Мир ${i / 10 + 1}`;
-        grid.appendChild(h);
-      }
+    for (let i = this.worldTab * 10; i < Math.min(LEVELS.length, this.worldTab * 10 + 10); i++) {
+      const lv = LEVELS[i];
       const b = document.createElement('button');
       b.className = 'level-card' + (lv.boss ? ' boss' : '');
       const best = Save.data.best[i];
       const locked = i + 1 > Save.data.unlocked;
       b.disabled = locked;
       const st = best ? best.stars : 0;
-      b.innerHTML = `<span class="num">Уровень ${i + 1}</span>
-        <span class="name">${locked ? '🔒 ' : lv.boss ? '👑 ' : ''}${lv.name}</span>
-        <span class="lstars">${'★'.repeat(st)}<span style="opacity:.3">${'★'.repeat(3 - st)}</span></span>
-        <span class="best">${best ? 'Рекорд: ' + fmtTime(best.time) + ' с' : 'Цель: ' + lv.par + ' с'}</span>`;
-      b.addEventListener('click', () => { Sound.init(); Sound.play('click'); playLevel(i); });
+      b.innerHTML = `<span class="num">${T('level')} ${i + 1}</span>
+        <span class="name">${locked ? ico('lock') : lv.boss ? ico('crown') : ''}${levelName(i)}</span>
+        <span class="lstars">${[0, 1, 2].map(k => ico(k < st ? 'star' : 'starOff')).join('')}</span>
+        <span class="best">${best ? T('best') + ': ' + fmtTime(best.time) + ' ' + T('sec') : T('target') + ': ' + lv.par + ' ' + T('sec')}</span>`;
+      b.addEventListener('click', () => { Sound.init(); Sound.play('click'); startLevel(i); });
       grid.appendChild(b);
-    });
+    }
   },
 
   showComplete(r) {
     const L = Game.level;
     const last = L.index === LEVELS.length - 1;
-    $('complete-title').textContent = last ? '🏆 Игра пройдена!' : 'Уровень пройден!';
+    $('complete-title').innerHTML = (last ? ico('trophy') : '') + T(last ? 'gameDone' : 'levelDone');
     $('complete-stars').innerHTML = [0, 1, 2].map(i =>
-      `<span class="${i < r.stars ? 'on' : 'off'}" style="animation-delay:${0.15 + i * 0.2}s">★</span>`).join('');
+      `<span class="${i < r.stars ? 'on' : 'off'}" style="animation-delay:${0.15 + i * 0.2}s">${ico(i < r.stars ? 'star' : 'starOff')}</span>`).join('');
     const best = Save.data.best[L.index];
+    const ok = v => v ? ico('check', 'ok') : '';
     $('complete-stats').innerHTML = `
-      <span>Время</span><b>${fmtTime(L.time)} с ${r.newTime ? '<span class="new">новый рекорд!</span>' : ''}</b>
-      <span>Рекорд</span><b>${fmtTime(best.time)} с</b>
-      <span>Монеты</span><b>${L.coinsTaken}/${L.coinsTotal} ${r.allCoins ? '✔' : ''}</b>
-      <span>Цель по времени</span><b>${L.def.par} с ${r.fast ? '✔' : ''}</b>
-      <span>Падения</span><b>${L.deaths}</b>
-      <span>Награда</span><b class="new">+${r.reward} 🪙</b>`;
-    $('btn-next').textContent = last ? '🎬 Финал' : 'Дальше ▶';
+      <span>${T('time')}</span><b>${fmtTime(L.time)} ${T('sec')} ${r.newTime ? `<span class="new">${T('newRecord')}</span>` : ''}</b>
+      <span>${T('best')}</span><b>${fmtTime(best.time)} ${T('sec')}</b>
+      <span>${T('coins')}</span><b>${L.coinsTaken}/${L.coinsTotal} ${ok(r.allCoins)}</b>
+      <span>${T('goalTime')}</span><b>${L.def.par} ${T('sec')} ${ok(r.fast)}</b>
+      <span>${T('falls')}</span><b>${L.deaths}</b>
+      <span>${T('reward')}</span><b class="new">+${r.reward} ${ico('coin')}</b>`;
+    $('btn-next').classList.toggle('hidden', last);
     setTimeout(() => this.show('complete'), 700);
   },
 };
+
+function applyStyle() {
+  const s = STYLES.includes(Save.data.menuStyle) ? Save.data.menuStyle : 'neon';
+  document.body.className = 'style-' + s;
+  MenuScene.reset();
+}
 
 function setState(s) {
   Game.state = s;
@@ -1485,7 +1680,7 @@ function setState(s) {
   $('btn-pause').classList.toggle('hidden', s !== 'playing');
   if (s !== 'playing' && s !== 'paused') $('bossbar').classList.add('hidden');
   $('touch').classList.toggle('hidden', !(s === 'playing' && isTouch()));
-  if (s === 'playing' || s === 'cutscene') UI.show(null);
+  if (s === 'playing') UI.show(null);
   if (s !== 'playing') Input.touch = {};
 }
 
@@ -1518,22 +1713,22 @@ function handleAction(a) {
       // первый непройденный открытый уровень
       let i = 0;
       while (i < LEVELS.length - 1 && Save.data.best[i] && i + 1 < Save.data.unlocked) i++;
-      playLevel(i);
+      startLevel(i);
       break;
     }
     case 'wheel': Wheel.show(); UI.show('wheel'); break;
-    case 'story': Cutscene.play('intro', goMenu); break;
-    case 'levels': UI.buildLevels(); if (Game.state === 'paused' || Game.state === 'complete') goMenu(); UI.show('levels'); break;
-    case 'howto': UI.show('howto'); break;
+    case 'levels':
+      if (Game.state === 'paused' || Game.state === 'complete') goMenu();
+      UI.worldTab = Math.min(Math.floor((Math.min(Save.data.unlocked, LEVELS.length) - 1) / 10), Math.ceil(LEVELS.length / 10) - 1);
+      UI.buildLevels(); UI.show('levels');
+      break;
+    case 'howto': UI.buildBestiary(); UI.show('howto'); break;
+    case 'upgrades': UI.buildUpgrades(); UI.show('upgrades'); break;
     case 'shop': UI.buildShop(); UI.show('shop'); break;
     case 'stats': UI.buildStats(); UI.show('stats'); break;
     case 'settings': UI.buildSettings(); UI.show('settings'); break;
-    case 'unlock-all':
-      Save.data.unlocked = LEVELS.length; Save.store();
-      UI.toast('<span class="t-title">🔓 Все уровни открыты!</span>Выбирай любой уровень в меню «Уровни»', 2600);
-      break;
     case 'reset':
-      if (confirm('Сбросить весь прогресс, монеты и скины?')) {
+      if (confirm(T('resetConfirm'))) {
         try { localStorage.removeItem('robplay-save'); } catch (e) { /* ignore */ }
         location.reload();
       }
@@ -1542,8 +1737,8 @@ function handleAction(a) {
     case 'resume': resume(); break;
     case 'restart': startLevel(Game.level.index); break;
     case 'next':
-      if (Game.level.index === LEVELS.length - 1) Cutscene.play('ending', goMenu);
-      else playLevel(Game.level.index + 1);
+      if (Game.level.index === LEVELS.length - 1) goMenu();
+      else startLevel(Game.level.index + 1);
       break;
     case 'toggle-sound': Save.data.muted = !Save.data.muted; Save.store(); Sound.apply(); UI.refreshToggles(); break;
     case 'toggle-music': Save.data.music = !Save.data.music; Save.store(); Sound.apply(); UI.refreshToggles(); break;
@@ -1557,8 +1752,6 @@ document.addEventListener('click', e => {
 });
 $('btn-pause').addEventListener('click', () => { Sound.init(); pause(); });
 $('btn-spin').addEventListener('click', () => Wheel.spin());
-$('cutscene').addEventListener('click', e => { if (e.target.id !== 'cs-skip') Cutscene.next(); });
-$('cs-skip').addEventListener('click', () => { Sound.play('click'); Cutscene.finish(); });
 let hoverT = 0;
 document.addEventListener('pointerover', e => {
   if (e.target.closest && e.target.closest('.btn, .level-card, .skin-card') && performance.now() - hoverT > 60) {
@@ -1571,13 +1764,6 @@ $('set-music').addEventListener('input', e => { Save.data.musicVol = e.target.va
 $('set-shake').addEventListener('change', e => { Save.data.shake = e.target.checked; Save.store(); });
 
 window.addEventListener('keydown', e => {
-  if (Game.state === 'cutscene') {
-    Sound.init();
-    if (e.code === 'Escape') Cutscene.finish();
-    else if (!e.repeat && (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyX' || e.code === 'KeyZ')) Cutscene.next();
-    e.preventDefault();
-    return;
-  }
   const a = KEYMAP[e.code];
   if (a) {
     if (!Input.keys[a]) Input.latch[a] = true;
@@ -1642,10 +1828,6 @@ function frame(now) {
   } else {
     acc = 0;
     updateParticles(dt);
-    if (Game.state === 'cutscene') {
-      Cutscene.update(dt);
-      MenuScene.t += dt; MenuScene.dist += dt * 25;
-    }
     if (Game.state === 'menu') {
       MenuScene.update(dt);
       UI.animateShop(dt);
@@ -1663,10 +1845,15 @@ function frame(now) {
 
 // ---------- Запуск ----------
 Save.load();
+if (!Save.data.lang) Save.data.lang = (navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en';
+renderIcons();
+applyLang();
+applyStyle();
 resize();
 UI.refreshToggles();
+UI.refreshAbilityButton();
 goMenu();
 requestAnimationFrame(frame);
 
 // Для отладки и автотестов
-window.RobPlay = { Game, startLevel, LEVELS, Save, Input, updateWorld, STEP, TILE, makeEnemy };
+window.RobPlay = { Game, startLevel, LEVELS, Save, Input, updateWorld, STEP, TILE, makeEnemy, UI };

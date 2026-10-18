@@ -3,12 +3,14 @@
 // ============================================================
 //  Анимированные декорации карт и жидкость в пропастях
 // ============================================================
-const LIQUID = { 5: 'lava', 6: 'water', 7: 'ice', 10: 'goo' };
+const LIQUID = { 5: 'lava', 6: 'water', 7: 'ice', 10: 'goo', 12: 'cloud', 13: 'data' };
 const LIQUID_COLORS = {
   lava: ['#ff9a3d', '#e2431f', '#ffd54a'],
   water: ['#4aa3d8', '#2a6a9c', '#bfe6ff'],
   ice: ['#9fd8f0', '#5a9ec4', '#ffffff'],
   goo: ['#8fe36a', '#3f8f2a', '#d9ff9a'],
+  cloud: ['#ffffff', '#dfe9f6', '#ffffff'],
+  data: ['#00ffc8', '#003a40', '#bafff0'],
 };
 
 // Перебор декораций слоя с параллаксом: fn(индекс, экранный x)
@@ -259,6 +261,75 @@ function drawDecor(L, cam, t) {
       });
       break;
     }
+    case 12: { // небесные острова: летающие острова с водопадами, мельницы, воздушные шары
+      eachDecor(cam, 0.22, 420, (i, x) => {
+        const y = 90 + hash(i + 3) * 120 + Math.sin(t * 0.6 + i) * 6, w = 70 + hash(i) * 60;
+        ctx.fillStyle = '#b7905a';
+        ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y); ctx.lineTo(x + w * 0.1, y + w * 0.6); ctx.lineTo(x - w * 0.15, y + w * 0.45); ctx.fill();
+        ctx.fillStyle = '#7ccf6a';
+        ctx.beginPath(); ctx.ellipse(x, y, w / 2, 9, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(x - w / 2, y - 1, w, 4);
+        ctx.fillStyle = 'rgba(160,220,255,0.75)';
+        const fx = x + w * 0.3;
+        ctx.fillRect(fx, y + 2, 5, 60 + hash(i) * 50);
+        for (let k = 0; k < 4; k++) { const ph = (t * 1.4 + k / 4) % 1; ctx.fillStyle = `rgba(255,255,255,${0.8 * (1 - ph)})`; ctx.fillRect(fx, y + 4 + ph * 90, 5, 4); }
+      });
+      eachDecor(cam, 0.45, 300, (i, x) => {
+        if (hash(i + 8) < 0.4) return;
+        const s = 0.8 + hash(i) * 0.5, top = base - 80 * s;
+        ctx.fillStyle = '#efe2c8';
+        ctx.beginPath(); ctx.moveTo(x - 12 * s, base); ctx.lineTo(x - 6 * s, top); ctx.lineTo(x + 6 * s, top); ctx.lineTo(x + 12 * s, base); ctx.fill();
+        ctx.fillStyle = '#c0644a'; ctx.beginPath(); ctx.moveTo(x - 9 * s, top); ctx.lineTo(x, top - 14 * s); ctx.lineTo(x + 9 * s, top); ctx.fill();
+        ctx.save(); ctx.translate(x, top + 4 * s); ctx.rotate(t * 1.4 + i);
+        ctx.fillStyle = '#ffffff';
+        for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-3 * s, 0, 6 * s, 40 * s); }
+        ctx.restore();
+      });
+      for (let i = 0; i < 3; i++) {
+        const x = ((t * (12 + i * 5) + i * 520) % (viewW + 200)) - 100, y = 70 + i * 60 + Math.sin(t + i) * 10;
+        ctx.fillStyle = ['#ff7ac8', '#ffd54a', '#6fd3ff'][i];
+        ctx.beginPath(); ctx.ellipse(x, y, 16, 19, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - 3, y - 18, 6, 36);
+        ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x - 10, y + 14); ctx.lineTo(x - 5, y + 28); ctx.moveTo(x + 10, y + 14); ctx.lineTo(x + 5, y + 28); ctx.stroke();
+        ctx.fillStyle = '#8a6a3a'; ctx.fillRect(x - 6, y + 27, 12, 8);
+      }
+      break;
+    }
+    case 13: { // кибер-мир: неоновая сетка, каркасные кубы, потоки данных
+      const hy = viewH * 0.62;
+      ctx.strokeStyle = 'rgba(0,255,200,0.22)'; ctx.lineWidth = 1;
+      for (let k = 0; k < 12; k++) {
+        const y = hy + Math.pow((k + (t * 0.5) % 1) / 12, 2) * (viewH - hy);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewW, y); ctx.stroke();
+      }
+      const vx0 = viewW / 2 - (cam.x * 0.3) % 80;
+      for (let k = -14; k <= 14; k++) {
+        ctx.beginPath(); ctx.moveTo(vx0 + k * 40, hy); ctx.lineTo(vx0 + k * 220, viewH); ctx.stroke();
+      }
+      eachDecor(cam, 0.3, 260, (i, x) => {
+        const y = 80 + hash(i + 1) * 150 + Math.sin(t + i) * 10, s = 18 + hash(i) * 14;
+        const a = t * (0.6 + hash(i + 2)) + i;
+        const pts = [];
+        for (const [px, py, pz] of [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]) {
+          const rx = px * Math.cos(a) - pz * Math.sin(a), rz = px * Math.sin(a) + pz * Math.cos(a);
+          const ry = py * Math.cos(a * 0.7) - rz * Math.sin(a * 0.7);
+          pts.push([x + rx * s, y + ry * s]);
+        }
+        ctx.strokeStyle = i % 2 ? 'rgba(255,60,200,0.6)' : 'rgba(0,255,200,0.6)'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (const [p0, p1] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) {
+          ctx.moveTo(pts[p0][0], pts[p0][1]); ctx.lineTo(pts[p1][0], pts[p1][1]);
+        }
+        ctx.stroke();
+      });
+      eachDecor(cam, 0.5, 90, (i, x) => {
+        if (hash(i + 4) < 0.6) return;
+        ctx.fillStyle = 'rgba(0,255,200,0.12)'; ctx.fillRect(x, 0, 2, viewH);
+        const ph = (t * 0.6 + hash(i)) % 1;
+        ctx.fillStyle = 'rgba(180,255,240,0.8)'; ctx.fillRect(x - 1, ph * viewH, 4, 14);
+      });
+      break;
+    }
     case 11: { // космос: планета с кольцом и спутник
       const px = viewW * 0.22 - cam.x * 0.03, py = viewH * 0.3;
       const g = ctx.createRadialGradient(px - 20, py - 20, 10, px, py, 70);
@@ -309,7 +380,11 @@ function drawLiquid(L, cam, t) {
     ctx.globalAlpha = 0.6;
     ctx.fillRect(x, top + Math.sin(t * 2.5 + x * 0.06) * 3 - 1, TILE, 2);
     ctx.globalAlpha = 1;
-    if (kind === 'lava' || kind === 'goo') {
+    if (kind === 'cloud') {
+      ctx.fillStyle = '#ffffff';
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x + 6 + k * 10, top + 4 + Math.sin(t * 1.5 + tx + k) * 3, 10, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (kind === 'lava' || kind === 'goo' || kind === 'data') {
       const ph = (t * 0.8 + hash(tx)) % 1;
       if (ph < 0.3) {
         ctx.fillStyle = c3;
